@@ -1,0 +1,111 @@
+library BitBench.Switcher.Manager;
+
+import Init="initialisation.bmasm";
+
+private static void Setup()
+{
+    .segment bench_general
+    .scope bitbench_switcher
+    .padvar byte current_process
+    .padvar short return_address
+    .endscope
+    .endsegment
+}
+
+private static void Proc()
+{
+    // Stack for every process must be stored as
+    // Return address if interrupted\self halted or start address if not started yet.
+    // CPU Flags
+    // A
+    // Y
+    // X
+    // Ram Bank
+    // Rom Bank
+
+    .scope bitbench_switcher
+    
+    .proc initialise
+
+        lda #$ff                ; set to nothing running. we use 0 to sit in a spin loop if nothing is scheduled
+        sta current_process
+
+        rts
+
+    .endproc
+
+    // activate a process and resume it from within in an interrupt
+    // works slightly differently to when called by a process handing back control. probably.
+    // if the current process is already tagged as running, then we assume nothing is to be done.
+    // Inputs:
+    // A: Process ID
+    .proc activate_process_interrupt
+
+        cmp current_process
+        beq all_done
+
+        tax     ; store current process for later
+
+        ; adjust stack so it can be rti'd
+        ; this proc must be called from the IRQ handler, with only this proc jsr'd
+        pla
+        sta return_address
+        pla
+        sta return_address + 1
+
+        ; store the full state.
+        ; pull registers from stack and store,
+        ; backup stack
+        tsx
+        .loop:
+        lda $100, x
+        inx
+        bne -loop
+
+        ; copy stack over
+        stx current_process
+
+        ; restore the full state.
+        ; restore stack -- its ready to be rti'd
+
+        ; push new ram bank
+
+        ; restore this jsr
+        lda return_address + 1
+        pha
+        lda return_address
+        pha
+
+    .all_done:
+        rts
+
+    .endproc
+
+    ; stacks are always stored ready to rti
+    .proc store_stack
+        rts
+    .endproc
+
+    .proc restore_stack
+        rts
+    .endproc
+
+    // store the data for a process so we can switch
+
+    .proc pause_process
+
+        lda #$ff                ; set to nothing running???
+        sta current_process
+
+        rts
+
+    .endproc
+    
+    .endscope
+}
+
+public override void Initialise()
+{
+    Init.Add(Proc);
+    Setup();
+}

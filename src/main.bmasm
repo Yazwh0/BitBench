@@ -1,0 +1,154 @@
+import BM="bench\BM.bmasm";
+import Globals="bench\globals.bmasm";
+import Init="bench\initialisation.bmasm";
+import Process="bench\process.bmasm";
+import Memory="bench\memory.bmasm";
+import ApiHelper="bench\apihelper.bmasm";
+import Switcher="bench\switcher.bmasm";
+import Scheduler="bench\scheduler.bmasm";
+
+.machine CommanderX16R42
+    BM.X16Header();
+
+    .scope bench_main
+
+    ; initialise the system
+    sei
+    
+    ; reset the stack, we never return
+    ldx #$ff
+    txs
+    phx ; add a empty entry for the stack pointer
+
+    jsr initialise
+
+    lda #11
+    ldx #<filename
+    ldy #>filename
+    jsr bitbench_process:load
+
+    cli
+
+    .loop: 
+    jmp loop
+
+    .proc initialise
+
+        cld
+
+        lda #1          ; Bench uses bank 1.
+        sta RAM_BANK 
+
+        sta IEN         ; vsync interrupt only
+        stz CTRL
+
+        jsr bitbench_memory:initialise
+        jsr bitbench_scheduler:initialise
+        jsr bitbench_process:initialise
+        jsr bitbench_switcher:initialise
+
+        jsr override_irq
+
+        rts
+
+    .endproc
+
+    .proc override_irq
+
+        // we need to override the whole handler, 
+        // so we use the vector at $fffe instead of $314
+        // this is because the routine at $314 isn't the whole interrupt handler.
+
+        lda $fffe
+        sta bench_general:zp_pointer
+        lda $ffff
+        sta bench_general:zp_pointer + 1
+
+        lda #$4c        ; jmp
+        sta (bench_general:zp_pointer)
+        ldy #1
+        lda #<irq
+        sta (bench_general:zp_pointer), y
+        iny
+        lda #>irq
+        sta (bench_general:zp_pointer), y
+
+        rts
+
+    .endproc
+
+    .proc irq
+
+        ; add extra data to the stack, prior to storage
+        pha
+        phy
+        phx
+
+        ; check if its a brk
+        txs
+        lda $106, x     ; +3 for stack pointer, plus three above 
+        and #$10
+        bne brk_hit
+
+        lda RAM_BANK
+        pha
+        lda ROM_BANK
+        pha
+
+        ; call kernel routies
+        stz ROM_BANK
+        jsr mouse_scan
+        jsr joystick_scan
+        jsr SCNKEY
+        ; clock_update isn't exposed so cannot call
+
+        ; check if we need to switch process
+        lda #1          ; Bench uses bank 1.
+        sta RAM_BANK 
+
+        jsr bitbench_scheduler:reset    ; reset scheduler for the frame
+        jsr bitbench_scheduler:get_next_process
+        jsr bitbench_switcher:activate_process_interrupt 
+
+        ; stack here will always have these values even if switched
+        pla 
+        sta ROM_BANK
+        pla
+        sta RAM_BANK
+
+        plx
+        ply
+        pla
+
+        rti
+
+        ; todo: handle brk
+    .brk_hit:
+        stp
+        jmp brk_hit
+
+    .endproc
+
+    .filename:
+    BM.Bytes("TESTAPP.BIN");
+
+    .segment bench_general
+    .scope bench_main
+    .padvar byte irq_hander_l
+    .padvar byte irq_hander_h
+    .endscope
+    .endsegment
+
+    .segment testapp $a000 $2000 TESTAPP.BIN
+    ApiHelper.Header("TEST", "entry", "exit", 1, 5);
+
+    .entry:
+        jmp entry
+
+    .exit:
+        rts
+
+    .endsegment
+
+    ; create procs
+    Init.Setup();

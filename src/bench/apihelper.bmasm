@@ -1,0 +1,21 @@
+import BM="BM.bmasm";
+
+library BitBench.ApiHelper.Manager;
+
+public static void Header(string name, string entry_vector_label, string close_vector_label,
+    byte frameUpdate, byte zpRequireCount)
+{
+    if (name.Length > 16)
+        throw new Exception("Name is too long, 16chars max.");
+
+    .word 0 ; for the first two bytes
+    BM.IsoPetscii(name.PadRight(16, ' '), false);
+    .entry_vector:
+    .word @(entry_vector_label)
+    .close_vector:
+    .word @(close_vector_label)
+    .requested_frame_update:
+    .byte @(frameUpdate)
+    .required_zp_count:
+    .byte @(zpRequireCount)
+}

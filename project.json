@@ -1,0 +1,88 @@
+{
+    "source": "src\\main.bmasm",
+    "sourceprg": "c:\\dev\\bitbench\\main.prg",
+    "runSource": false,
+    "startAddress": "2064",
+    "CaptureChanges": true,
+    "memoryFillValue" : 192,
+    "symbols": [
+        {
+            "symbols": "C:\\Documents\\Source\\x16-rom\\build\\x16\\kernal.sym",
+            "romBank": 0,
+            "RangeDefinitions": [
+                {
+                    "type": "jumpTable",
+                    "Start": "0xFEBD",
+                    "End": "0xFF80"
+                },
+                {
+                    "Start": "0xFF81",
+                    "End": "0xFFF6"
+                }
+            ]
+        },
+        {
+            "symbols": "C:\\Documents\\Source\\x16-rom\\build\\x16\\keymap.sym",
+            "romBank": 1
+        },
+        {
+            "symbols": "C:\\Documents\\Source\\x16-rom\\build\\x16\\dos.sym",
+            "romBank": 2,
+            "RangeDefinitions": [
+                {
+                    "type": "jumpTable",
+                    "Start": "0xc000",
+                    "End": "0xc036"
+                }
+            ]
+        },
+        {
+            "symbols": "C:\\Documents\\Source\\x16-rom\\build\\x16\\fat32.sym",
+            "romBank": 3
+        },
+        {
+            "symbols": "C:\\Documents\\Source\\x16-rom\\build\\x16\\basic.sym",
+            "romBank": 4
+        },
+        {
+            "symbols": "C:\\Documents\\Source\\x16-rom\\build\\x16\\monitor.sym",
+            "romBank": 5
+        },
+        {
+            "symbols": "C:\\Documents\\Source\\x16-rom\\build\\x16\\charset.sym",
+            "romBank": 6
+        },
+        {
+            "symbols": "C:\\Documents\\Source\\x16-rom\\build\\x16\\codex.sym",
+            "romBank": 7
+        },
+        {
+            "symbols": "C:\\Documents\\Source\\x16-rom\\build\\x16\\graph.sym",
+            "romBank": 8
+        },
+        {
+            "symbols": "C:\\Documents\\Source\\x16-rom\\build\\x16\\demo.sym",
+            "romBank": 9
+        },
+        {
+            "symbols": "C:\\Documents\\Source\\x16-rom\\build\\x16\\audio.sym",
+            "romBank": 10
+        },
+        {
+            "symbols": "C:\\Documents\\Source\\x16-rom\\build\\x16\\util.sym",
+            "romBank": 11
+        },
+        {
+            "symbols": "C:\\Documents\\Source\\x16-rom\\build\\x16\\bannex.sym",
+            "romBank": 12
+        }
+    ],
+    "SdCardFiles": [
+    ],
+    "CompileOptions": {
+        "DisplaySegments": true,
+        "BinFolder" : "Bin",
+        "DisplayVariables" : false,
+        "Rebuild" : false
+    }
+}

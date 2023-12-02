@@ -1,0 +1,307 @@
+library BitBench.Process.Manager;
+
+import Init="initialisation.bmasm";
+ 
+private static void Setup()
+{
+/*
+//  Process needs:
+//  byte: Primary Ram Bank
+//  byte: Number of bytes from 0x22 that need to be preserved
+//  byte: Location of stack
+//  byte: Location of ZP data + registers
+*/
+    .segment bench_process
+    .scope bitbench_process
+    
+    .process_data:
+    for(var i = 0; i < 256/4; i++)
+    {
+        .padvar byte primary_block_@(i)
+        .padvar byte state_@(i)
+        .padvar byte stack_block_@(i)
+        .padvar byte data_block_@(i)
+    }
+
+    .endscope
+    .endsegment
+}
+
+private static void Proc()
+{
+    .scope bitbench_process
+
+    .const PrimaryBank = 0
+    .const State = 1           ; whether the process has been interrupted, or handed back control
+    .const StackBlock = 2
+    .const DataBlock = 3
+
+    .proc initialise
+
+        ldx #0
+        .loop:
+        stz process_data + PrimaryBank, x
+        stz process_data + State, x
+        stz process_data + StackBlock, x
+        stz process_data + DataBlock, x
+        inx
+        inx
+        inx
+        inx
+        bne loop
+
+        // mark first process as in use so we can't allocate 0
+        lda #$ff
+        sta process_data + PrimaryBank
+
+        rts
+
+    .endproc
+
+    .segment bench_general
+    .scope bitbench_process
+
+    .padvar byte offset
+    .padvar byte new_process
+
+    .endscope
+    .endsegment
+    .scope bitbench_process
+
+    // Create a process, allocate memory and setup stack
+    // Input
+    // A: Main bank
+    // Output
+    // A: Process ID
+    // X: Stack Block
+    // Y: Data Block
+    .proc createprocess
+
+        pha
+ 
+        ; search for first available process ID
+        ldx #0
+        .loop:
+        lda process_data + PrimaryBank, x
+        beq process_found                       ; find first process that isn't assigned a bank
+        inx
+        inx
+        inx
+        inx
+        jmp -loop
+
+        .process_found:
+        txa
+        clc
+        ror
+        ror                                     ; A now contains the process ID, X the offset
+
+        sta new_process                         ; store so we can resuse these
+        stx offset
+        pla
+        sta process_data + PrimaryBank, x       ; mark process id as reserved
+
+        ; allocate stack block, A is number of blocks, X is process ID
+        ldx new_process
+        lda #1
+        jsr bitbench_memory:allocate_block
+        bcs error
+        pha                                     ; stack block, to be returned in X
+
+        ldx offset                              ; store stack block number in the process struct
+        sta process_data + StackBlock, x
+
+        ; allocation data block
+        ldx new_process
+        lda #1
+        jsr bitbench_memory:allocate_block
+        bcs error_pl
+
+        tay                                     ; data block, returned value in Y
+
+        ldx offset
+        sta process_data + DataBlock, x
+
+        ; return process ID
+        lda new_process
+        plx                                     ; set stack block in return register
+        rts
+
+        .error_pl:
+        phx
+        .error:                                 ; out of memory
+        sec
+        rts
+
+    .endproc
+
+    .scope bitbench_process
+
+    // Input
+    // A: Process ID
+    .proc closeprocess
+
+        tax
+        stz process_data + PrimaryBank, x
+        stz process_data + State, x
+        stz process_data + StackBlock, x
+        stz process_data + DataBlock, x
+
+        rts
+
+    .endproc
+
+
+    .segment bench_general
+    .scope bitbench_process
+
+    .padvar byte new_bank
+    .padvar byte new_process
+
+    .endscope
+    .endsegment
+
+    .scope bitbench_process
+
+    // load a new process, but not activate it. This should be done via the scheduler
+    // Input:
+    // X,Y : Address of filename
+    // A : length of filename
+    // Output:
+    // A: Process ID
+    .proc load
+
+        .const SETNAM = $FFBD
+        .const SETLFS = $FFBA
+        .const LOAD = $FFD5
+
+        sta bitbench_zp:scratch
+        lda ROM_BANK
+        pha
+        stz ROM_BANK                        ; switch to kernel as we use it to load
+
+        lda bitbench_zp:scratch
+
+        ; parameters are in the form for SETNAM
+        jsr SETNAM
+
+        lda #1
+        ldx #8
+        ldy #0
+        jsr SETLFS
+
+        ; create process. Need allocation the process to a bank before we can load.
+        ; first find the bank where we will load to
+        lda #1
+        ldx #$fe                            ; temporary process ID
+        jsr bitbench_memory:allocate_bank
+        bcs error
+
+        sta new_bank                        ; bank number in A, store for later
+        
+        jsr createprocess                   ; reserves up blocks and sets up defaults, returns process ID, stack block (x) and data block (sy)
+        bcs error
+
+        stx bench_general:zp_pointer + 1    ; store stack block number for indirect addressing, for stach initialisation
+        stz bench_general:zp_pointer
+
+        sty bench_general:zp_pointer2 + 1   ; stock data block number 
+        ;stz bench_general:zp_pointer2      ; not needed, as overriden later
+
+        sta new_process                     ; store process ID to return it
+        ldx new_bank
+
+        jsr bitbench_memory:update_bank     ; update the bank to the actual process ID
+
+        lda RAM_BANK
+        pha
+        lda new_bank
+        sta RAM_BANK
+
+        lda #0
+        ldx #<$a000
+        ldy #>$a000
+        jsr LOAD 
+        bcs error_pl
+
+        ; setup stack, (bitbench_zp:zp_pointer) is a pointer to the stack block
+        ; intial stack should be entryaddress, CPU flags, A, X, Y, rom_bank, ram_bank, stack_pointer
+        ; CPU flags, A, X and Y are zero so they can be predicted
+        ; Rom bank is set to the kernel
+        ldy #@(0xff - 8)
+
+        ; entry address
+        lda bench_general:application_entry_l
+        sta (bench_general:zp_pointer), y
+        iny
+
+        lda bench_general:application_entry_h
+        sta (bench_general:zp_pointer), y
+        iny
+        ; CPU Flags
+        lda #0
+        sta (bench_general:zp_pointer), y
+        iny
+        ; A
+        sta (bench_general:zp_pointer), y
+        iny
+        ; X
+        sta (bench_general:zp_pointer), y
+        iny
+        ; Y
+        sta (bench_general:zp_pointer), y
+        iny
+        ; RAM Bank
+        lda RAM_BANK
+        sta (bench_general:zp_pointer), y
+        iny
+        ; ROM Bank
+        lda #0
+        sta (bench_general:zp_pointer), y
+        iny
+        ; Stack pointer
+        lda #$ef
+        sta (bench_general:zp_pointer), y      ; should be $xxff
+
+        ; clear data area
+        ldy bench_general:application_zp_count
+        beq data_copy_done
+        lda #$22                                
+        sta bench_general:zp_pointer2
+        lda #0
+    .loop:
+        dey
+        sta (bench_general:zp_pointer2), y
+        bne -loop
+    .data_copy_done:
+
+        pla
+        sta RAM_BANK                        ; restore original ROM Bank
+
+        pla
+        sta ROM_BANK
+
+        lda new_process
+        jsr bitbench_scheduler:enable_process ; set the process to run
+        
+        lda new_process
+        clc
+        rts
+
+        .error_pl:
+        pla
+        .error:                             ; out of memory or file not found
+        pla
+        sec
+        rts
+ 
+    .endproc
+
+    .endscope
+}
+
+public override void Initialise()
+{
+    Init.Add(Proc);
+    Setup();
+}

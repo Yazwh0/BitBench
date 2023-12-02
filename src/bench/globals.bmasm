@@ -1,0 +1,38 @@
+library BitBench.Globals.Manager;
+
+import Init="initialisation.bmasm";
+
+private static void Setup()
+{
+    ; define segment ranges
+    .segment bench_zp $d4 $2c
+    .segment bench_memory $a000 $200
+    .segment bench_scheduler $a200 $100
+    .segment bench_general $a300 $100
+    .segment bench_process $a400 $100
+    .segment bench_app_header $a000 $100
+
+    .segment bench_zp
+    .scope bench_general
+
+    .const application_entry_l $a010
+    .const application_entry_h $a011
+    .const application_close_l $a012
+    .const application_close_h $a013
+    .const application_frame_update $a014
+    .const application_zp_count $a015
+
+    .padvar ushort zp_pointer
+    .padvar ushort zp_pointer2
+
+    .endscope
+    .endsegment
+
+
+}
+
+public override void Initialise()
+{
+    Setup();
+}
+ 

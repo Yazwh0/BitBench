@@ -1,0 +1,210 @@
+library BitBench.Scheduler.Manager;
+
+import Init="initialisation.bmasm";
+ 
+private static void Setup()
+{
+    
+/*
+//    Scheduler needs:
+//    byte: Counter till wake
+//    byte: Count Required
+//    byte: Main Bank
+//    byte: Hold
+*/
+
+    .segment bench_scheduler
+    .scope bitbench_scheduler
+
+    .const WakeCount = 0
+    .const Required = 1
+    .const Bank = 2
+    .const Hold = 3
+
+    .const max_processes = 16       ; all data structures are currently for 64 processes
+
+    .scheduler_data:
+    for(var i = 0; i < 256/4; i++)
+    {
+        .padvar byte wakecount_@(i)
+        .padvar byte required_@(i)
+        .padvar byte mainbank_@(i)
+        .padvar byte hold_@(i)
+    }
+
+    .endscope
+    .endsegment
+
+    .segment bench_general
+    .scope bitbench_scheduler
+
+    .padvar byte state              ; if we're looking for 'realtime' processes or not
+    .padvar byte current_priority
+    .padvar byte current_process
+    .padvar byte current_counter
+
+    .endscope
+    .endsegment
+}
+
+private static void Proc()
+{
+    .scope bitbench_scheduler
+
+    .proc initialise
+ 
+        lda #$ff
+        ldx #0
+        .loop:
+        stz scheduler_data + WakeCount, x
+        stz scheduler_data + Required, x
+        stz scheduler_data + Bank, x
+        sta scheduler_data + Hold, x            ; set all processes on hold
+        inx
+        inx
+        inx
+        inx
+        bne loop
+
+        stz state
+        stz current_priority
+        stz current_process
+
+        ; ; test
+        ; lda #1
+        ; sta required_2
+        ; stz wakecount_2
+        ; stz hold_2
+
+        rts
+
+    .endproc
+
+    ; set a process to run
+    ; Input
+    ; A: Process ID
+    .proc enable_process
+
+        rol
+        rol
+        tax
+        stz scheduler_data + Hold, x                ; clear the hold flag
+
+        rts
+
+    .endproc
+
+    ; Get the next process to activate
+    ; Output
+    ; A: process ID, if zero then nothing to do
+    ; Z: If A is zero.
+    ; Will search for 'realtime' processes first
+    .proc get_next_process
+
+        ldx state
+        bne non_priority
+
+        lda current_priority
+        lsr                                         ; convert A to index into scheduler
+        lsr
+        tax
+        ldy current_counter                         ; max of 64 processes, so we want to escape when this hits zero, reset every frame
+        .loop:
+        lda scheduler_data + Hold, x                ; is the process on hold?
+        bne +end_loop
+        lda scheduler_data + Required, x            ; if zero then 'realtime'
+        beq +found
+
+        .end_loop:
+        inx                                         ; next index
+        inx
+        inx
+        inx
+
+        dey                                         ; any more?
+        bne -loop
+        jmp not_found                               ; look for a normal process
+
+        .found:
+        dey
+        sty current_counter                         ; keep counter for next time
+        txa
+        lsr
+        lsr                                         ; A now has process ID, Z should be set
+
+        sta current_priority
+
+        rts
+
+        .not_found:
+        lda #1
+        sta state
+        ldy #max_processes
+        sty current_counter
+
+        .non_priority:
+
+        lda current_process
+        clc
+        rol
+        rol
+        tax
+        ldy current_counter                      ; we ensure we only let each process run once
+        .loop:
+        lda scheduler_data + Hold, x             ; is the process on hold?
+        bne +end_loop
+        lda scheduler_data + WakeCount, x        ; if zero then this process is up next
+        beq +found
+
+        dec scheduler_data + WakeCount, x        ; dec its wait count
+
+        .end_loop:
+        inx
+        inx
+        inx
+        inx
+
+        dey                                      ; any more?
+        bne -loop
+        jmp no_process
+
+        .found:
+        dey
+        sty current_counter                      ; keep counter for next time
+        lda scheduler_data + Required, x         ; reset counter
+        sta scheduler_data + WakeCount, x
+
+        txa
+        clc
+        lsr
+        lsr                                      ; A now has process ID, Z should be set
+
+        sta current_process
+
+        rts
+        .no_process:
+
+        lda #0                                   ; indicate there is nothing to do
+        rts
+
+    .endproc
+
+    ; reset the lookup priority
+    .proc reset
+
+        stz state
+        lda #max_processes
+        sta current_counter
+        rts
+
+    .endproc
+
+    .endscope
+}
+
+public override void Initialise()
+{
+    Init.Add(Proc);
+    Setup();
+}
+

@@ -1,0 +1,243 @@
+library BitBench.Memory.Manager;
+
+/* 
+// Memory is given out in 256byte blocks
+*/
+ 
+import Init="initialisation.bmasm";
+
+private static void Setup()
+{
+    .segment bench_memory
+    .scope bitbench_memory
+
+    .padvar byte[256] blocks
+    .padvar byte[256] banks
+
+    .endscope
+    .endsegment
+
+    .segment bench_zp
+    .scope bitbench_zp
+
+    .padvar byte scratch
+    .padvar byte scratch_b
+
+    .endscope
+    .endsegment
+}
+
+private static void Proc()
+{
+    .scope bitbench_memory
+    
+    .const minblock = 0x04
+    .const maxblock = 0x9e
+    .const minbank = 0x02
+    .const maxbank = 0xff
+
+    .proc initialise
+
+        lda #$ff
+        ldx #0
+
+        .loop:
+        sta blocks, x
+        stz banks, x
+        dex
+        cpx #maxblock
+        bne -loop
+
+        .loop:
+        stz blocks, x
+        stz banks, x
+        dex
+        cpx #minblock-1
+        bne -loop
+
+        .loop:
+        sta blocks, x
+        stz banks, x
+        dex
+        bne -loop
+
+        sta banks       ; first two banks are used by the kernel and bitbench
+        ldx #1
+        sta banks, x
+
+        ; reserve space for the loader while it is not in ROM.
+        lda #$ff
+        ldx #$08
+        sta blocks, x
+        inx
+        sta blocks, x
+        inx
+        sta blocks, x
+        inx
+        sta blocks, x
+
+        rts
+
+    .endproc
+
+    ; Input
+    ; A: number of continuous blocks
+    ; X: allocation number
+    ; Output
+    ; A: start block
+    ; C: if set, couldn't allocate
+    .proc allocate_block
+        
+        phx
+        sta bitbench_zp:scratch
+        ldx #minblock
+
+        .loop:
+        lda blocks, x
+        bne nextblock
+                
+        ldy bitbench_zp:scratch         ; found a candidate
+
+        .checkavailable:
+        dey
+        beq done_success     ; all done? then we've found our allocation
+
+        inx
+        cpx #maxblock
+        beq done_failure
+        lda blocks, x
+        beq checkavailable
+
+        .nextblock:
+        inx
+        cpx #maxblock
+        bne -loop
+
+        .done_failure:
+        plx
+        sec
+        rts
+
+        .done_success:
+        pla                 ; we've found the space, now work backwards and fill the allocation
+
+        .loop:
+        sta blocks, x
+        iny
+        dex
+        cpy bitbench_zp:scratch
+        bne -loop
+
+        txa                 ; x is the first block discovered-1
+        inc
+
+        clc
+        rts
+
+    .endproc
+
+    ; Input
+    ; X start block
+    ; A number of blocks
+    .proc deallocate_block
+
+        .loop:
+        stz blocks, x
+        inx
+        dec
+        bne loop
+
+        rts
+
+    .endproc
+
+    ; Input
+    ; A: number of continuous blocks
+    ; X: allocation number
+    ; Output
+    ; A: start block
+    ; C: if set, couldn't allocate
+    .proc allocate_bank
+        
+        phx
+        sta bitbench_zp:scratch
+        ldx #minbank
+
+        .loop:
+        lda banks, x
+        bne nextbank
+                
+        ldy bitbench_zp:scratch         ; found a candidate
+
+        .checkavailable:
+        dey
+        beq done_success     ; all done? then we've found our allocation
+
+        inx
+        cpx #maxbank
+        beq done_failure
+        lda banks, x
+        beq checkavailable
+
+        .nextbank:
+        inx
+        cpx #maxbank
+        bne -loop
+
+        .done_failure:
+        plx
+        sec
+        rts
+
+        .done_success:
+        pla                 ; we've found the space, now work backwards and fill the allocation
+
+        .loop:
+        sta banks, x
+        iny
+        dex
+        cpy bitbench_zp:scratch
+        bne -loop
+
+        txa                 ; x is the first block discovered-1
+        inc
+
+        clc
+        rts
+
+    .endproc
+ 
+    // Input
+    // A: New process ID
+    // X: Bank Number
+    .proc update_bank
+
+        sta banks, x
+
+        rts
+
+    .endproc
+
+    ; Input
+    ; X start block
+    ; A number of blocks
+    .proc deallocate_bank
+
+        .loop:
+        stz banks, x
+        inx
+        dec
+        bne loop
+
+        rts
+
+    .endproc
+
+    .endscope
+}
+
+public override void Initialise()
+{
+    Init.Add(Proc);
+    Setup();
+}
