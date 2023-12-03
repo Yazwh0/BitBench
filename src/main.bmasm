@@ -59,11 +59,14 @@ import Scheduler="bench\scheduler.bmasm";
         // so we use the vector at $fffe instead of $314
         // this is because the routine at $314 isn't the whole interrupt handler.
 
+        stz ROM_BANK
+
         lda $fffe
         sta bench_general:zp_pointer
         lda $ffff
         sta bench_general:zp_pointer + 1
 
+        ; replace default handler with a jump to our own.
         lda #$4c        ; jmp
         sta (bench_general:zp_pointer)
         ldy #1
@@ -85,10 +88,14 @@ import Scheduler="bench\scheduler.bmasm";
         phx
 
         ; check if its a brk
-        txs
+        tsx
         lda $106, x     ; +3 for stack pointer, plus three above 
         and #$10
         bne brk_hit
+
+        ; clear interrupt flag
+        lda #01
+        sta ISR
 
         lda RAM_BANK
         pha
@@ -125,7 +132,7 @@ import Scheduler="bench\scheduler.bmasm";
         ; todo: handle brk
     .brk_hit:
         stp
-        jmp brk_hit
+        jmp brk_hit    
 
     .endproc
 

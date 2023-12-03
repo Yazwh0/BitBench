@@ -8,7 +8,6 @@ public static void Header(string name, string entry_vector_label, string close_v
     if (name.Length > 16)
         throw new Exception("Name is too long, 16chars max.");
 
-    .word 0 ; for the first two bytes
     BM.IsoPetscii(name.PadRight(16, ' '), false);
     .entry_vector:
     .word @(entry_vector_label)
