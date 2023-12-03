@@ -75,6 +75,10 @@ private static void Proc()
         sta blocks, x
         inx
         sta blocks, x
+        inx
+        sta blocks, x
+        inx
+        sta blocks, x
 
         rts
 

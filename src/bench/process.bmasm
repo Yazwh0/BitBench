@@ -7,7 +7,7 @@ private static void Setup()
 /*
 //  Process needs:
 //  byte: Primary Ram Bank
-//  byte: Number of bytes from 0x22 that need to be preserved
+//  byte: unused
 //  byte: Location of stack
 //  byte: Location of ZP data + registers
 */
@@ -277,15 +277,21 @@ private static void Proc()
         bne -loop
     .data_copy_done:
 
+        ; get process priority value
+        ldy bench_general:application_frame_update
+
+        lda #1
+        sta RAM_BANK
+
+        lda new_process
+        jsr bitbench_scheduler:enable_process ; set the process to run and the required frames
+        
         pla
         sta RAM_BANK                        ; restore original ROM Bank
 
         pla
         sta ROM_BANK
 
-        lda new_process
-        jsr bitbench_scheduler:enable_process ; set the process to run
-        
         lda new_process
         clc
         rts

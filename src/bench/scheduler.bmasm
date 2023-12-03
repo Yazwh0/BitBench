@@ -82,13 +82,16 @@ private static void Proc()
 
     ; set a process to run
     ; Input
-    ; A: Process ID
+    ; A: Process ID,
+    ; Y: Required count
     .proc enable_process
-
+                        
         rol
         rol
         tax
         stz scheduler_data + Hold, x                ; clear the hold flag
+        tya
+        sta scheduler_data + Required, x
 
         rts
 
@@ -105,10 +108,11 @@ private static void Proc()
         bne non_priority
 
         lda current_priority
-        lsr                                         ; convert A to index into scheduler
-        lsr
+        clc
+        rol                                         ; convert A to index into scheduler
+        rol
         tax
-        ldy current_counter                         ; max of 64 processes, so we want to escape when this hits zero, reset every frame
+        ldy current_counter                         ; max of 16 processes, so we want to escape when this hits zero, reset every frame
         .loop:
         lda scheduler_data + Hold, x                ; is the process on hold?
         bne +end_loop
@@ -179,7 +183,7 @@ private static void Proc()
         lsr
         lsr                                      ; A now has process ID, Z should be set
 
-        sta current_process
+        ;sta current_process
 
         rts
         .no_process:

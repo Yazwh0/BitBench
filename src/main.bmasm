@@ -27,6 +27,11 @@ import Scheduler="bench\scheduler.bmasm";
     ldy #>filename
     jsr bitbench_process:load
 
+    lda #12
+    ldx #<filename2
+    ldy #>filename2
+    jsr bitbench_process:load
+
     cli
 
     .loop: 
@@ -114,7 +119,10 @@ import Scheduler="bench\scheduler.bmasm";
         sta RAM_BANK 
 
         jsr bitbench_scheduler:reset    ; reset scheduler for the frame
-        jsr bitbench_scheduler:get_next_process
+        jsr bitbench_scheduler:get_next_process ; returns 0 if nothing to do
+
+        beq nothing_to_do               
+
         jsr bitbench_switcher:activate_process_interrupt 
 
         ; stack here will always have these values even if switched
@@ -134,10 +142,34 @@ import Scheduler="bench\scheduler.bmasm";
         stp
         jmp brk_hit    
 
+    .nothing_to_do:
+        jsr bitbench_switcher:store_process
+        ; set the return value to the idle loop sprocs
+        ; empty the stack, and push a dummy entry
+        ldx #$fe
+        txs
+
+        lda #>idle_loop
+        pha
+        lda #<idle_loop
+        pha
+        lda #0
+        pha     ; cpu flags
+
+        rti        
+    .endproc
+
+    .proc idle_loop
+
+    .loop:
+        jmp loop
+
     .endproc
 
     .filename:
     BM.Bytes("TESTAPP.BIN");
+    .filename2:
+    BM.Bytes("TESTAPP2.BIN");
 
     .segment bench_general
     .scope bench_main
@@ -147,12 +179,30 @@ import Scheduler="bench\scheduler.bmasm";
     .endsegment
 
     .segment testapp $a000 $2000 TESTAPP.BIN
-    ApiHelper.Header("TEST", "entry", "exit", 1, 5);
+    ApiHelper.Header("TEST", "entry", "exit", 1, 1);
 
-    .entry:
-        jmp entry
+    .entry:    
+        nop
+    .loop:
+        nop
+        jmp -loop
 
     .exit:
+        rts
+
+    .endsegment
+
+    .segment testapp2 $a000 $2000 TESTAPP2.BIN
+    ApiHelper.Header("TEST2", "entry2", "exit2", 2, 1);
+
+    .byte 1, 2, 3, 4, 5
+    .entry2:
+        nop
+    .loop2:
+        nop
+        jmp loop2
+
+    .exit2:
         rts
 
     .endsegment

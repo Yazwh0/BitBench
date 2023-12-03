@@ -56,46 +56,15 @@ private static void Proc()
         pla
         sta return_address + 1
 
-        ; get pointer addresses for current process
-        lda current_process     
-        cmp #$ff                                    ; startup
-        beq no_current_process   
-        SetZpPointersRamBankToCurrentProcess();        // stamps A and X
+        CopyCurrentProcess();
 
-        ; bench_general:zp_pointer now points to stack,
-        ; bench_general:zp_pointer2 points to data
-
-        ; backup stack
-        tsx
-        txa
-        ldy #$ff
-        sta (bench_general:zp_pointer), y           ; store stack pointer at the end of the stack
-        tay
-    .loop:
-        lda $100, x
-        sta (bench_general:zp_pointer), y
-        inx
-        iny
-        cpy #$ff
-        bne -loop                                   ; we dont want to write when y = $ff
-
-        ; backup data
-        ldy bench_general:application_zp_count
-        beq +data_copy_done
-        lda #$22
-        sta bench_general:zp_pointer2
-        dey
-    .loop:
-        lda $00, y
-        sta (bench_general:zp_pointer2), y
-        bne -loop
-    .data_copy_done:
-
-    .no_current_process:
         ; copy new process stack
+        lda #1
+        sta RAM_BANK
+
         lda next_process
         sta current_process
-        SetZpPointersRamBankToCurrentProcess();        // stamps A and X
+        SetZpPointersRamBankToCurrentProcess();        // stamps A and X, and sets RAM Bank
         
         ldy #$ff
         lda (bench_general:zp_pointer), y               ; get stack pointer        
@@ -127,7 +96,6 @@ private static void Proc()
         sta RAM_BANK
 
         ; restore this jsr
-        ; todo: this coul be a jmp??
         lda return_address + 1
         pha
         lda return_address
@@ -136,6 +104,25 @@ private static void Proc()
     .all_done:
         rts
 
+    .endproc
+
+    .proc store_process
+        pla
+        sta return_address
+        pla
+        sta return_address + 1
+
+        CopyCurrentProcess();
+
+        lda #1
+        sta RAM_BANK
+
+        lda return_address + 1
+        pha
+        lda return_address
+        pha
+
+        rts
     .endproc
 
     ; stacks are always stored ready to rti
@@ -161,9 +148,9 @@ private static void Proc()
     .endscope
 }
 
-// Assumes A has the current_process, destroys A and X
 public static void SetZpPointersRamBankToCurrentProcess()
 {
+    ; Assumes A has the current_process, destroys A and X
     clc
     rol 
     rol     ; * 4
@@ -178,6 +165,48 @@ public static void SetZpPointersRamBankToCurrentProcess()
 
     lda bitbench_process:process_data + bitbench_process:PrimaryBank, x
     sta RAM_BANK                            ; fetch primary bank and switch
+}
+
+public static void CopyCurrentProcess()
+{
+    ; get pointer addresses for current process
+    lda current_process     
+    cmp #$ff                                    ; startup
+    beq no_current_process   
+    SetZpPointersRamBankToCurrentProcess();        // stamps A and X, and sets RAM Bank
+
+    ; bench_general:zp_pointer now points to stack,
+    ; bench_general:zp_pointer2 points to data
+
+    ; backup stack
+    tsx
+    txa
+    ldy #$ff
+    sta (bench_general:zp_pointer), y           ; store stack pointer at the end of the stack
+    tay
+    inx
+    iny
+.loop:
+    lda $100, x
+    sta (bench_general:zp_pointer), y
+    inx
+    iny
+    cpy #$ff
+    bne -loop                                   ; we dont want to write when y = $ff
+
+    ; backup data
+    ldy bench_general:application_zp_count
+    beq +data_copy_done
+    lda #$22
+    sta bench_general:zp_pointer2
+    dey
+.loop:
+    lda $00, y
+    sta (bench_general:zp_pointer2), y
+    dey
+    bne -loop
+.data_copy_done:    
+.no_current_process:
 }
 
 public override void Initialise()
