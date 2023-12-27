@@ -39,9 +39,13 @@ private static void Setup()
     .scope bitbench_scheduler
 
     .padvar byte state              ; if we're looking for 'realtime' processes or not
-    .padvar byte current_priority
     .padvar byte current_process
-    .padvar byte current_counter
+
+    .padvar byte process_index
+    .padvar byte process_count
+
+    .padvar byte realtime_index
+    .padvar byte realtime_count
 
     .endscope
     .endsegment
@@ -67,8 +71,15 @@ private static void Proc()
         bne loop
 
         stz state
-        stz current_priority
         stz current_process
+
+        lda #1
+        sta realtime_index
+        sta process_index
+
+        lda #$0f
+        sta realtime_count
+        sta process_count
 
         ; ; test
         ; lda #1
@@ -90,14 +101,19 @@ private static void Proc()
         rol
         tax
         stz scheduler_data + Hold, x                ; clear the hold flag
+
         tya
         sta scheduler_data + Required, x
+
+        lda #1                                      ; always wake next
+        sta scheduler_data + WakeCount, x
 
         rts
 
     .endproc
 
     ; Get the next process to activate
+    ; Needs to have Ram bank for BitBench set.
     ; Output
     ; A: process ID, if zero then nothing to do
     ; Z: If A is zero.
@@ -106,13 +122,15 @@ private static void Proc()
 
         ldx state
         bne non_priority
+        
+        lda realtime_index                          ; need to invert to get countdown, this doesn't get reset each frame
+        and #$0f
+        ldy realtime_count                          ; counter to ensure we only do 16 checks per frame
 
-        lda current_priority
         clc
         rol                                         ; convert A to index into scheduler
         rol
         tax
-        ldy current_counter                         ; max of 16 processes, so we want to escape when this hits zero, reset every frame
         .loop:
         lda scheduler_data + Hold, x                ; is the process on hold?
         bne +end_loop
@@ -124,49 +142,62 @@ private static void Proc()
         inx
         inx
         inx
+        txa
+        and #$3f
+        tax
 
         dey                                         ; any more?
         bne -loop
         jmp not_found                               ; look for a normal process
 
         .found:
-        dey
-        sty current_counter                         ; keep counter for next time
         txa
-        lsr
-        lsr                                         ; A now has process ID, Z should be set
-
-        sta current_priority
+        clc
+        ror
+        ror
+        sta current_process            
+        inc
+        sta realtime_index                          ; keep the index for next time
+        iny
+        sty realtime_count
 
         rts
 
         .not_found:
+        ;txa                                        ; if its not found then the index won't change
+        ;clc
+        ;ror
+        ;ror
+        ;sta realtime_index                         ; keep the index for next time
+ 
         lda #1
         sta state
-        ldy #max_processes
-        sty current_counter
 
         .non_priority:
 
-        lda current_process
+        lda process_index                           ; get index
+        and #$0f
+        ldy process_count
+
         clc
         rol
         rol
         tax
-        ldy current_counter                      ; we ensure we only let each process run once
         .loop:
         lda scheduler_data + Hold, x             ; is the process on hold?
         bne +end_loop
-        lda scheduler_data + WakeCount, x        ; if zero then this process is up next
-        beq +found
 
-        dec scheduler_data + WakeCount, x        ; dec its wait count
+        dec scheduler_data + WakeCount, x        ; dec its wait count, if zero its the next process
+        beq +found
 
         .end_loop:
         inx
         inx
         inx
         inx
+        txa
+        and #$3f
+        tax
 
         dey                                      ; any more?
         bne -loop
@@ -174,20 +205,24 @@ private static void Proc()
 
         .found:
         dey
-        sty current_counter                      ; keep counter for next time
+        sty process_count                       ; dec so we start from next process next time
+        clc
+        txa
+        ror
+        ror
+        sta current_process
+        inc
+        sta process_index                       ; inc so we start from the next process next time
+        
         lda scheduler_data + Required, x         ; reset counter
         sta scheduler_data + WakeCount, x
 
-        txa
-        clc
-        lsr
-        lsr                                      ; A now has process ID, Z should be set
-
-        ;sta current_process
+        lda current_process
 
         rts
         .no_process:
 
+        stz process_index
         lda #0                                   ; indicate there is nothing to do
         rts
 
@@ -197,8 +232,11 @@ private static void Proc()
     .proc reset
 
         stz state
-        lda #max_processes
-        sta current_counter
+
+        lda #$0f
+        sta realtime_count
+        sta process_count
+
         rts
 
     .endproc

@@ -1,4 +1,4 @@
-import BM="bench\BM.bmasm";
+import BM="src\bench\BM.bmasm";
 import Globals="bench\globals.bmasm";
 import Init="bench\initialisation.bmasm";
 import Process="bench\process.bmasm";
@@ -112,7 +112,7 @@ import Scheduler="bench\scheduler.bmasm";
         jsr mouse_scan
         jsr joystick_scan
         jsr SCNKEY
-        ; clock_update isn't exposed so cannot call
+        ; clock_update isn't exposed so cannot call 
 
         ; check if we need to switch process
         lda #1          ; Bench uses bank 1.
@@ -162,6 +162,7 @@ import Scheduler="bench\scheduler.bmasm";
     .proc idle_loop
 
     .loop:
+        wai
         jmp loop
 
     .endproc
@@ -179,12 +180,14 @@ import Scheduler="bench\scheduler.bmasm";
     .endsegment
 
     .segment testapp $a000 $2000 TESTAPP.BIN
-    ApiHelper.Header("TEST", "entry", "exit", 1, 1);
+    ApiHelper.Header("TEST", "entry", "exit", 2, 1);
 
     .entry:    
         nop
+        stz $02
     .loop:
-        nop
+        wai
+        inc $02
         jmp -loop
 
     .exit:
@@ -198,8 +201,10 @@ import Scheduler="bench\scheduler.bmasm";
     .byte 1, 2, 3, 4, 5
     .entry2:
         nop
+        stz $03
     .loop2:
-        nop
+        wai
+        inc $03
         jmp loop2
 
     .exit2:

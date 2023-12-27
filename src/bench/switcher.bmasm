@@ -56,7 +56,7 @@ private static void Proc()
         pla
         sta return_address + 1
 
-        CopyCurrentProcess();
+        StoreCurrentProcess();
 
         ; copy new process stack
         lda #1
@@ -112,7 +112,7 @@ private static void Proc()
         pla
         sta return_address + 1
 
-        CopyCurrentProcess();
+        StoreCurrentProcess();
 
         lda #1
         sta RAM_BANK
@@ -167,7 +167,7 @@ public static void SetZpPointersRamBankToCurrentProcess()
     sta RAM_BANK                            ; fetch primary bank and switch
 }
 
-public static void CopyCurrentProcess()
+public static void StoreCurrentProcess()
 {
     ; get pointer addresses for current process
     lda current_process     

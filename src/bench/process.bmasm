@@ -200,8 +200,14 @@ private static void Proc()
         sta new_bank                        ; bank number in A, store for later
         
         jsr createprocess                   ; reserves up blocks and sets up defaults, returns process ID, stack block (x) and data block (sy)
-        bcs error
+        bcc no_error
 
+    .error:                                 ; out of memory
+        pla
+        sec
+        rts
+ 
+    .no_error:
         stx bench_general:zp_pointer + 1    ; store stack block number for indirect addressing, for stach initialisation
         stz bench_general:zp_pointer
 
@@ -298,11 +304,6 @@ private static void Proc()
 
         .error_pl:
         pla
-        .error:                             ; out of memory or file not found
-        pla
-        sec
-        rts
- 
     .endproc
 
     .endscope
