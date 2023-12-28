@@ -1,7 +1,7 @@
-namespace BenchTests;
+namespace BenchTests.Process;
 
 [TestClass]
-public class ProcessTests
+public class Create
 {
     [TestMethod]
     public async Task CreateProcess()

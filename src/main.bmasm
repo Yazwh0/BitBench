@@ -1,4 +1,4 @@
-import BM="src\bench\BM.bmasm";
+import BM="bench\BM.bmasm";
 import Globals="bench\globals.bmasm";
 import Init="bench\initialisation.bmasm";
 import Process="bench\process.bmasm";
@@ -180,15 +180,20 @@ import Scheduler="bench\scheduler.bmasm";
     .endsegment
 
     .segment testapp $a000 $2000 TESTAPP.BIN
-    ApiHelper.Header("TEST", "entry", "exit", 2, 1);
+    ApiHelper.Header("TEST", "entry", "exit", 1, 1);
 
     .entry:    
         nop
         stz $02
     .loop:
-        wai
+        jsr test_proc
         inc $02
         jmp -loop
+
+    .proc test_proc
+        wai
+        rts
+    .endproc
 
     .exit:
         rts
@@ -196,16 +201,21 @@ import Scheduler="bench\scheduler.bmasm";
     .endsegment
 
     .segment testapp2 $a000 $2000 TESTAPP2.BIN
-    ApiHelper.Header("TEST2", "entry2", "exit2", 2, 1);
+    ApiHelper.Header("TEST2", "entry2", "exit2", 1, 1);
 
     .byte 1, 2, 3, 4, 5
     .entry2:
         nop
         stz $03
     .loop2:
-        wai
+        jsr test_proc2
         inc $03
         jmp loop2
+
+    .proc test_proc2
+        wai
+        rts
+    .endproc
 
     .exit2:
         rts
