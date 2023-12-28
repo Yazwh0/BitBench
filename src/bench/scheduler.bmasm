@@ -39,7 +39,7 @@ private static void Setup()
     .scope bitbench_scheduler
 
     .padvar byte state              ; if we're looking for 'realtime' processes or not
-    .padvar byte current_process
+    .padvar byte process_toreturn
 
     .padvar byte process_index
     .padvar byte process_count
@@ -71,11 +71,10 @@ private static void Proc()
         bne loop
 
         stz state
-        stz current_process
+        stz process_toreturn
 
-        lda #1
-        sta realtime_index
-        sta process_index
+        stz realtime_index
+        stz process_index
 
         lda #$0f
         sta realtime_count
@@ -132,6 +131,9 @@ private static void Proc()
         rol
         tax
         .loop:
+        dey                                         ; any more?
+        beq not_found
+
         lda scheduler_data + Hold, x                ; is the process on hold?
         bne +end_loop
         lda scheduler_data + Required, x            ; if zero then 'realtime'
@@ -146,20 +148,19 @@ private static void Proc()
         and #$3f
         tax
 
-        dey                                         ; any more?
-        bne -loop
-        jmp not_found                               ; look for a normal process
+        jmp -loop                               ; look for a normal process
 
         .found:
         txa
         clc
         ror
         ror
-        sta current_process            
+        sta process_toreturn            
         inc
         sta realtime_index                          ; keep the index for next time
         iny
         sty realtime_count
+        lda process_toreturn
 
         rts
 
@@ -172,6 +173,7 @@ private static void Proc()
  
         lda #1
         sta state
+        stz realtime_count
 
         .non_priority:
 
@@ -184,6 +186,7 @@ private static void Proc()
         rol
         tax
         .loop:
+
         lda scheduler_data + Hold, x             ; is the process on hold?
         bne +end_loop
 
@@ -200,35 +203,41 @@ private static void Proc()
         tax
 
         dey                                      ; any more?
-        bne -loop
-        jmp no_process
+        beq no_process
+
+        jmp -loop
 
         .found:
-        dey
-        sty process_count                       ; dec so we start from next process next time
+        sty process_count                       ; store process count for next time
         clc
         txa
         ror
         ror
-        sta current_process
+        sta process_toreturn
         inc
         sta process_index                       ; inc so we start from the next process next time
         
         lda scheduler_data + Required, x         ; reset counter
         sta scheduler_data + WakeCount, x
 
-        lda current_process
+        lda process_toreturn
 
         rts
-        .no_process:
 
-        stz process_index
+        .no_process:
+        clc
+        txa
+        ror
+        ror
+        sta process_index
+
+        stz process_count
         lda #0                                   ; indicate there is nothing to do
         rts
 
     .endproc
 
-    ; reset the lookup priority
+    ; reset the lookup priority, dont reset the process position
     .proc reset
 
         stz state

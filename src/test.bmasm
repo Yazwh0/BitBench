@@ -1,0 +1,47 @@
+import BM="bench\BM.bmasm";
+import Globals="bench\globals.bmasm";
+import Init="bench\initialisation.bmasm";
+import Process="bench\process.bmasm";
+import Memory="bench\memory.bmasm";
+import ApiHelper="bench\apihelper.bmasm";
+import Switcher="bench\switcher.bmasm";
+import Scheduler="bench\scheduler.bmasm";
+
+.machine CommanderX16R42
+
+.org $810
+
+cld
+sei
+
+ldx #$ff
+txs
+
+lda #1
+sta RAM_BANK
+sta IEN
+stz CTRL
+
+jsr bitbench_memory:initialise
+jsr bitbench_scheduler:initialise
+jsr bitbench_process:initialise
+
+lda #02 ; main bank is #2
+jsr bitbench_process:createprocess
+
+ldy #01
+jsr bitbench_scheduler:enable_process
+
+jsr bitbench_scheduler:reset
+jsr bitbench_scheduler:get_next_process
+jsr bitbench_scheduler:get_next_process
+jsr bitbench_scheduler:reset
+
+;stp
+
+jsr bitbench_scheduler:get_next_process
+
+stp
+
+; create procs
+Init.Setup();       

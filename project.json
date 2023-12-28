@@ -1,7 +1,7 @@
 {
-    "source": "src\\main.bmasm",
-    "sourceprg": "c:\\dev\\bitbench\\main.prg",
-    "runSource": false,
+    "source": "src\\test.bmasm",
+    "sourceprg": "c:\\dev\\bitbench\\test.prg",
+    "runSource": true,
     "startAddress": "2064",
     "CaptureChanges": true,
     "memoryFillValue" : 192,
