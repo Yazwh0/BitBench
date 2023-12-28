@@ -1,7 +1,7 @@
-namespace BenchTests;
+namespace BenchTests.Scheduler;
 
 [TestClass]
-public class SchedulerTests_OneNormal
+public class OneNormal
 { 
     [TestMethod]
     public async Task Get()

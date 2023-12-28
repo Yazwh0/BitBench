@@ -1,7 +1,7 @@
-namespace BenchTests;
+namespace BenchTests.Scheduler;
 
 [TestClass]
-public class SchedulerTests_OneRealtime
+public class OneRealtime
 { 
     [TestMethod]
     public async Task Get()
@@ -332,14 +332,18 @@ public class SchedulerTests_OneRealtime
 
         snapshot.Compare()
             .Is(Registers.A, 0x00) // Nothing else to do
+            .Is(MemoryAreas.BankedRam, 0x01a300, 0x01) // looking at normal processes
             .Is(MemoryAreas.BankedRam, 0x01a302, 0x00) // index to look from next time, shouldn't be changed
             .Is(MemoryAreas.BankedRam, 0x01a303, 0x00) // number of processes to check before looping
+            .Is(MemoryAreas.BankedRam, 0x01a304, 0x00) // index to look from next time, shouldn't be changed
+            .Is(MemoryAreas.BankedRam, 0x01a305, 0x00) // number of processes to check before looping
             .CanChange(Registers.Y)
             .CanChange(Registers.X)
+            .CanChange(MemoryAreas.BankedRam, 0x01a204) // scratch space
             .IgnoreNumericCpuFlags()
             .IgnoreVia()
             .IgnoreVera()
             .IgnoreStackHistory()
-            .AssertNoOtherChanges();    
+            .AssertNoOtherChanges();   
     }
 }

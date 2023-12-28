@@ -1,7 +1,7 @@
-namespace BenchTests;
+namespace BenchTests.Scheduler;
 
 [TestClass]
-public class SchedulerTests
+public class Initialise
 { 
     [TestMethod]
     public async Task EnableProcess()
