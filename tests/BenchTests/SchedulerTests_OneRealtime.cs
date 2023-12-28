@@ -1,7 +1,7 @@
 namespace BenchTests;
 
 [TestClass]
-public class SchedulerTests_OneProcess
+public class SchedulerTests_OneRealtime
 { 
     [TestMethod]
     public async Task Get()
@@ -34,7 +34,7 @@ public class SchedulerTests_OneProcess
                 lda #02 ; main bank is #2
                 jsr bitbench_process:createprocess
 
-                ldy #01
+                ldy #0 ; realtime
                 jsr bitbench_scheduler:enable_process
 
                 jsr bitbench_scheduler:reset
@@ -55,11 +55,12 @@ public class SchedulerTests_OneProcess
 
         snapshot.Compare()
             .Is(Registers.A, 0x01) // Process 1 is next
-            .Is(MemoryAreas.BankedRam, 0x01a300, 0x01) // looking at 'normal' processes
+            .Is(MemoryAreas.BankedRam, 0x01a300, 0x00) // looking at 'realtime' processes
             .Is(MemoryAreas.BankedRam, 0x01a301, 0x01) // current process
-            .Is(MemoryAreas.BankedRam, 0x01a302, 0x02) // index to look from next time
-            .Is(MemoryAreas.BankedRam, 0x01a303, 0x0e) // number of processes to check before looping
-            .Is(MemoryAreas.BankedRam, 0x01a305, 0x00) // all realtime processes have been checked
+            .Is(MemoryAreas.BankedRam, 0x01a302, 0x00) // normal process index
+            .Is(MemoryAreas.BankedRam, 0x01a303, 0x0f) // normal process count
+            .Is(MemoryAreas.BankedRam, 0x01a304, 0x02) // realtime index to look from next time
+            .Is(MemoryAreas.BankedRam, 0x01a305, 0x0d) // realtime process count
             .CanChange(Registers.Y)
             .CanChange(Registers.X)
             .IgnoreNumericCpuFlags()
@@ -100,7 +101,7 @@ public class SchedulerTests_OneProcess
                 lda #02 ; main bank is #2
                 jsr bitbench_process:createprocess
 
-                ldy #01
+                ldy #0 ; realtime
                 jsr bitbench_scheduler:enable_process
 
                 jsr bitbench_scheduler:reset
@@ -122,10 +123,14 @@ public class SchedulerTests_OneProcess
 
         snapshot.Compare()
             .Is(Registers.A, 0x00) // Nothing else to do
+            .Is(MemoryAreas.BankedRam, 0x01a300, 0x01) // looking at normal processes
             .Is(MemoryAreas.BankedRam, 0x01a302, 0x00) // index to look from next time, shouldn't be changed
             .Is(MemoryAreas.BankedRam, 0x01a303, 0x00) // number of processes to check before looping
+            .Is(MemoryAreas.BankedRam, 0x01a304, 0x00) // index to look from next time, shouldn't be changed
+            .Is(MemoryAreas.BankedRam, 0x01a305, 0x00) // number of processes to check before looping
             .CanChange(Registers.Y)
             .CanChange(Registers.X)
+            .CanChange(MemoryAreas.BankedRam, 0x01a204) // scratch space
             .IgnoreNumericCpuFlags()
             .IgnoreVia()
             .IgnoreVera()
@@ -190,6 +195,7 @@ public class SchedulerTests_OneProcess
             .Is(MemoryAreas.BankedRam, 0x01a300, 0x00) // looking at 'realtime' processes
             .Is(MemoryAreas.BankedRam, 0x01a302, 0x00) // index to look from next time
             .Is(MemoryAreas.BankedRam, 0x01a303, 0x0f) // number of processes to check before looping
+            .Is(MemoryAreas.BankedRam, 0x01a304, 0x00) // realtime index to check next time
             .Is(MemoryAreas.BankedRam, 0x01a305, 0x0f) // number of realtime processes to check before looping
             .IgnoreNumericCpuFlags()
             .IgnoreVia()
@@ -229,7 +235,7 @@ public class SchedulerTests_OneProcess
                 lda #02 ; main bank is #2
                 jsr bitbench_process:createprocess
 
-                ldy #01
+                ldy #0 ; realtime
                 jsr bitbench_scheduler:enable_process
 
                 jsr bitbench_scheduler:reset
@@ -254,18 +260,19 @@ public class SchedulerTests_OneProcess
 
         snapshot.Compare()
             .Is(Registers.A, 0x01) // Process 1 is next
-            .Is(MemoryAreas.BankedRam, 0x01a300, 0x01) // looking at 'normal' processes
+            .Is(MemoryAreas.BankedRam, 0x01a300, 0x00) // looking at 'realtime' processes
             .Is(MemoryAreas.BankedRam, 0x01a301, 0x01) // current process
-            .Is(MemoryAreas.BankedRam, 0x01a302, 0x02) // index to look from next time
-            .Is(MemoryAreas.BankedRam, 0x01a303, 0x0e) // number of processes to check before looping
-            .Is(MemoryAreas.BankedRam, 0x01a305, 0x00) // all realtime processes have been checked
+            .Is(MemoryAreas.BankedRam, 0x01a302, 0x00) // normal process index
+            .Is(MemoryAreas.BankedRam, 0x01a303, 0x0f) // normal process count
+            .Is(MemoryAreas.BankedRam, 0x01a304, 0x02) // realtime index to look from next time
+            .Is(MemoryAreas.BankedRam, 0x01a305, 0x0d) // realtime process count
             .CanChange(Registers.Y)
             .CanChange(Registers.X)
             .IgnoreNumericCpuFlags()
             .IgnoreVia()
             .IgnoreVera()
             .IgnoreStackHistory()
-            .AssertNoOtherChanges();    
+            .AssertNoOtherChanges();
     }
     
     [TestMethod]
@@ -299,7 +306,7 @@ public class SchedulerTests_OneProcess
                 lda #02 ; main bank is #2
                 jsr bitbench_process:createprocess
 
-                ldy #01
+                ldy #0 ; realtime
                 jsr bitbench_scheduler:enable_process
 
                 jsr bitbench_scheduler:reset

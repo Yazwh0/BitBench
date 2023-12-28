@@ -129,47 +129,53 @@ private static void Proc()
         clc
         rol                                         ; convert A to index into scheduler
         rol
-        tax
+        tax        
         .loop:
         dey                                         ; any more?
-        beq not_found
 
         lda scheduler_data + Hold, x                ; is the process on hold?
         bne +end_loop
+
         lda scheduler_data + Required, x            ; if zero then 'realtime'
         beq +found
 
         .end_loop:
-        inx                                         ; next index
-        inx
-        inx
-        inx
+        clc
         txa
+        adc #$04
         and #$3f
         tax
+
+        cpy #0
+        beq not_found
 
         jmp -loop                               ; look for a normal process
 
         .found:
-        txa
-        clc
-        ror
-        ror
-        sta process_toreturn            
-        inc
-        sta realtime_index                          ; keep the index for next time
-        iny
         sty realtime_count
+
+        clc
+        txa
+        ror
+        ror
+        sta process_toreturn     
+
+        inc
+        and #$0f
+        sta realtime_index                          ; keep the index for next time
+
         lda process_toreturn
 
         rts
 
         .not_found:
-        ;txa                                        ; if its not found then the index won't change
-        ;clc
-        ;ror
-        ;ror
-        ;sta realtime_index                         ; keep the index for next time
+        clc
+        txa                                        ; if its not found then the index won't change
+        ror
+        ror
+        inc
+        and #$0f
+        sta realtime_index                         ; keep the index for next time
  
         lda #1
         sta state
@@ -186,6 +192,10 @@ private static void Proc()
         rol
         tax
         .loop:
+        dey                                      
+
+        lda scheduler_data + Required, x         ; realtime?
+        beq +end_loop
 
         lda scheduler_data + Hold, x             ; is the process on hold?
         bne +end_loop
@@ -194,27 +204,28 @@ private static void Proc()
         beq +found
 
         .end_loop:
-        inx
-        inx
-        inx
-        inx
+        clc
         txa
+        adc #$04
         and #$3f
         tax
 
-        dey                                      ; any more?
+        cpy #0
         beq no_process
 
         jmp -loop
 
         .found:
         sty process_count                       ; store process count for next time
+
         clc
         txa
         ror
         ror
         sta process_toreturn
+
         inc
+        and #$0f
         sta process_index                       ; inc so we start from the next process next time
         
         lda scheduler_data + Required, x         ; reset counter
@@ -229,6 +240,8 @@ private static void Proc()
         txa
         ror
         ror
+        inc
+        and #$0f
         sta process_index
 
         stz process_count

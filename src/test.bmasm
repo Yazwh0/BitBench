@@ -34,8 +34,6 @@ jsr bitbench_scheduler:enable_process
 
 jsr bitbench_scheduler:reset
 jsr bitbench_scheduler:get_next_process
-jsr bitbench_scheduler:get_next_process
-jsr bitbench_scheduler:reset
 
 ;stp
 

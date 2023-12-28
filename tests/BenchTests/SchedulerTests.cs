@@ -95,9 +95,6 @@ public class SchedulerTests
                 ldy #01
                 jsr bitbench_scheduler:enable_process
                 
-                jsr bitbench_scheduler:reset
-                jsr bitbench_scheduler:get_next_process
-
                 stp
 
                 jsr bitbench_scheduler:reset
@@ -123,4 +120,65 @@ public class SchedulerTests
             .IgnoreStackHistory()
             .AssertNoOtherChanges();    
     }    
+
+    [TestMethod]
+    public async Task ResetGet()
+    {
+        var (emulator, snapshot) = await X16TestHelper.EmulateTemplateChanges(@"
+                import Globals=""..\..\..\..\..\src\bench\globals.bmasm"";
+                import Scheduler=""..\..\..\..\..\src\bench\scheduler.bmasm"";
+                import Init=""..\..\..\..\..\src\bench\initialisation.bmasm"";
+                import Memory=""..\..\..\..\..\src\bench\memory.bmasm"";
+                import Process=""..\..\..\..\..\src\bench\process.bmasm"";
+                .machine CommanderX16R42
+
+                .org $810
+
+                cld
+                sei
+
+                ldx #$ff
+                txs
+
+                lda #1
+                sta RAM_BANK
+                sta IEN
+                stz CTRL
+
+                jsr bitbench_memory:initialise
+                jsr bitbench_scheduler:initialise
+                jsr bitbench_process:initialise
+                
+                jsr bitbench_scheduler:reset
+
+                clc
+
+                stp
+
+                jsr bitbench_scheduler:get_next_process
+
+                stp
+
+                ; create procs
+                Init.Setup();                
+                ");
+
+        snapshot.Snap();
+
+        emulator.Emulate();
+
+        snapshot.Compare()
+            .Is(Registers.A, 0x00)
+            .CanChange(Registers.X)
+            .Is(MemoryAreas.BankedRam, 0x01a300, 0x01) // looking at normal processes
+            .Is(MemoryAreas.BankedRam, 0x01a302, 0x00) // normal process index
+            .Is(MemoryAreas.BankedRam, 0x01a303, 0x00) // number of normal processes to check before looping
+            .Is(MemoryAreas.BankedRam, 0x01a304, 0x00) // realtime index
+            .Is(MemoryAreas.BankedRam, 0x01a305, 0x00) // realtime count
+            .IgnoreNumericCpuFlags()
+            .IgnoreVia()
+            .IgnoreVera()
+            .IgnoreStackHistory()
+            .AssertNoOtherChanges();    
+    }        
 }
