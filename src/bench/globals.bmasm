@@ -11,10 +11,11 @@ private static void Setup()
     .segment bench_general $a300 $100
     .segment bench_process $a400 $100
     .segment bench_app_header $a000 $100
-    .segment bench_window $a500 $100
+    .segment bench_window $a500 $200
 
     .segment bench_zp, scope=bench_general
 
+    ; todo, match these with the api helper
     .const application_entry_l $a010
     .const application_entry_h $a011
     .const application_close_l $a012
@@ -22,16 +23,21 @@ private static void Setup()
     .const application_frame_update $a014
     .const application_zp_count $a015
 
+    .const bank_kernel = $00
+    .const bank_bench = $01
+    .const bank_windowmap = $02
+
     .padvar ushort zp_pointer
     .padvar ushort zp_pointer2
-
-    .endsegment
-
-    .segment bench_general, scope=bench_general
-
+    .padvar byte factor1
+    .padvar byte factor2
     .padvar byte return_rambank
+    .padvar ushort mouse_x
+    .padvar ushort mouse_y
+    .padvar byte mouse_buttons
+    .padvar byte keyboard
 
-    .endsegment
+    .endsegment    
 }
 
 public override void Initialise()

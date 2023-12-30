@@ -15,7 +15,7 @@ private static void Setup()
 
     .endsegment
 
-    .segment bench_zp scope=bench_zp
+    .segment bench_zp, scope=bench_zp
 
     .padvar byte scratch
     .padvar byte scratch_b
@@ -27,9 +27,14 @@ private static void Proc()
 {
     .scope bench_memory
     
+    ; banks:
+    ; 0 - Kernel
+    ; 1 - BitBench
+    ; 2 - Window map
+
     .const minblock = 0x04
     .const maxblock = 0x9e
-    .const minbank = 0x02
+    .const minbank = 0x03 
     .const maxbank = 0xff
 
     .proc initialise

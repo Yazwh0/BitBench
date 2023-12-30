@@ -10,13 +10,16 @@ private static void Setup()
 {
     ; VRAM Map
     ; Tilemap starts at $00000
+    ; Tilemap           $00000 - $03c00
+    ; Application vram  $03c00 - $13000
+    ; todo: move sprites to a more suitable location
 
     .segment bench_window, scope=bench_window
 
     .constvar byte window_width = $02
     .constvar byte window_height = $03
-    .constvar byte window_top = $04
-    .constvar byte window_left = $05
+    .constvar byte window_left = $04
+    .constvar byte window_top = $05
     .constvar ushort window_title = $06
     
     .constvar byte window_bordercolour = $02
@@ -35,12 +38,17 @@ private static void Setup()
     .const window_title_offset = 4
     .const window_zorder_offset = 6
     .const window_processid_offset = 7
+    .const window_vram_addr_offset = 8
+    .const window_vram_len_offset = 11
+    .const window_padding1_offset = 13
+    .const window_padding2_offset = 14
+    .const window_padding3_offset = 15
 
     .const max_windows = 16
 
     .window_data:
-     for(var i = 0; i < 16; i++)
-     {
+    for(var i = 0; i < 16; i++)
+    {
         .padvar byte width_@(i)
         .padvar byte height_@(i)
         .padvar byte top_@(i)
@@ -48,7 +56,17 @@ private static void Setup()
         .padvar ushort title_@(i)
         .padvar byte zorder_@(i)
         .padvar byte process_id_@(i)
-     }
+        .padvar ushort vram_addr_@(i)
+        .padvar byte vram_addrh_@(i)
+        .padvar ushort vram_addr_@(i)
+        .padvar byte padding1_@(i)
+        .padvar byte padding2_@(i)
+        .padvar byte padding3_@(i)
+    }
+    
+    .padvar byte vram_addr_l
+    .padvar byte vram_addr_m
+    .padvar byte vram_addr_h
 
     .endsegment
 }
@@ -125,11 +143,44 @@ private static void Proc()
         
         clc
         txa
-        adc #8
+        adc #16
         tax
 
         dey
         bne -loop
+
+        ; set base of application vram
+        stz vram_addr_l
+        lda #$3c
+        sta vram_addr_m
+        lda #$10            ; add stepping here, as it will always be by one.
+        sta vram_addr_h 
+
+        ; clear window map bank
+        lda RAM_BANK
+        pha
+
+        lda #bench_general:bank_windowmap
+        sta RAM_BANK
+
+        lda #$a0
+        stz bench_general:zp_pointer
+        sta bench_general:zp_pointer + 1
+
+        ldx #$20
+        ldy #0
+        lda #$ff
+
+    .loop:
+        sta (bench_general:zp_pointer), y
+        dey
+        bne -loop
+        inc bench_general:zp_pointer + 1
+        dex
+        bne -loop
+
+        pla
+        sta RAM_BANK
 
         rts
 
@@ -152,12 +203,16 @@ private static void Proc()
         ; loop through the window list looking for a empty slot.
         ; adjust zorder by one as we go
 
-        ldy #0
         pha
-        ldx #0
 
-        lda RAM_BANK
-        sta bench_general:return_rambank
+        ldx RAM_BANK
+        stx bench_general:return_rambank
+
+        ldx #bench_general:bank_bench
+        stx RAM_BANK
+
+        ldy #0
+        ldx #0
 
     .loop:
         lda window_data + window_processid_offset, x
@@ -169,7 +224,7 @@ private static void Proc()
 
         clc
         txa
-        adc #8
+        adc #16
         tax
 
         lda window_data + window_processid_offset, x
@@ -178,6 +233,14 @@ private static void Proc()
 
         jmp -loop
 
+    .error_no_space:
+        lda bench_general:return_rambank
+        sta RAM_BANK
+
+        pla
+        sec        
+        rts
+
     .found_position:
         pla
         phy
@@ -185,10 +248,18 @@ private static void Proc()
         sta window_data + window_processid_offset, x   
 
         lda window_width
-        sta window_data + window_width_offset, x   
+        sta window_data + window_width_offset, x
+        dec
+        dec
+        sta bench_general:factor1     ; used to muliply later
 
         lda window_height
-        sta window_data + window_height_offset, x   
+        sta window_data + window_height_offset, x
+        dec
+        dec
+        clc
+        rol ; * 2 as its tile+colour data
+        sta bench_general:factor2
 
         lda window_top
         sta window_data + window_top_offset, x   
@@ -203,14 +274,16 @@ private static void Proc()
         lda window_title + 1
         sta window_data + window_title_offset + 1, x   
 
+        phx
+
     .loop:
         cpy #max_windows + 1
-        beq done
+        beq +done
         
         iny
         clc
         txa
-        adc #8
+        adc #16
         tax
 
         lda window_data + window_processid_offset, x
@@ -220,19 +293,126 @@ private static void Proc()
         jmp -loop
 
     .done:
+        ; allocate VRAM
+        ; multiply height-2 * width-2 * 2
+        lda #0
+        ldx #8
+        lsr bench_general:factor1
+    .loop:
+        bcc no_add
+        clc
+        adc bench_general:factor2
+    .no_add:
+        ror
+        ror bench_general:factor1
+        dex
+        bne -loop
+        sta bench_general:factor2
+
+        plx
+
+        ; factor1/2 should now have the total size
+        ; store length
+        lda bench_general:factor1
+        sta window_data + window_vram_len_offset, x
+        lda bench_general:factor2
+        sta window_data + window_vram_len_offset + 1, x
+
+        ; set data port before we overwrite the pointer
+        stz CTRL
+        lda vram_addr_l
+        sta ADDRx_L
+        lda vram_addr_m
+        sta ADDRx_M
+        lda vram_addr_h
+        sta ADDRx_H
+
+        ; store vram position and add length
+        clc
+        lda vram_addr_l
+        sta window_data + window_vram_addr_offset, x
+        adc bench_general:factor1
+        sta vram_addr_l
+
+        lda vram_addr_m
+        sta window_data + window_vram_addr_offset + 1, x
+        adc bench_general:factor2
+        sta vram_addr_m
+
+        lda vram_addr_h
+        sta window_data + window_vram_addr_offset + 2, x
+        adc #0
+        sta vram_addr_h
+
+        ; clear the vram
+        lda bench_general:factor1
+        ldx bench_general:factor2
+        inx
+
+        ; must be a quicker way to do this!
+    .loop:
+        stz DATA0
+        dec
+        bne -loop
+        dex
+        beq +done
+        jmp -loop
+        
+    .done:
+        ; write in window map
+        lda #bench_general:bank_windowmap
+        sta RAM_BANK
+ 
+        ; use top\left parameters as a pointer
+        lda window_top
+
+        clc
+        rol window_left
+        clc
+        ror
+        ror window_left
+
+        clc
+        adc #$a0
+        sta window_top
+        ; left, top should now point to the location in the window map
+
+        pla             ; get window id
+        pha 
+
+        ; loop through and set all entries in the map to the window id. add 128 each line.
+        ldx window_height
+        ldy window_width
+    .loop:
+        dey
+        sta (window_left), y
+        bne -loop
+
+        dex
+        beq +done
+
+        pha
+        clc
+        lda window_left
+        adc #$80
+        sta window_left
+        lda window_top
+        adc #0
+        sta window_top    
+        pla
+
+        ldy window_width
+        iny
+    
+        jmp -loop
+
+    .done:
+
         lda bench_general:return_rambank
         sta RAM_BANK
 
         pla
         clc
-        rts
-
-    .error_no_space:
-        lda bench_general:return_rambank
-        sta RAM_BANK
-
-        pla
-        sec        
         rts
 
     .endproc
@@ -246,9 +426,13 @@ private static void Proc()
         ldx RAM_BANK
         stx bench_general:return_rambank
 
+        ldx #bench_general:bank_bench
+        stx RAM_BANK
+
         clc
 
-        rol ; * 8
+        rol ; * 16
+        rol
         rol
         rol
 
@@ -260,10 +444,11 @@ private static void Proc()
         sta RAM_BANK
 
         rts
-        
+
     .endproc
 
     ; draw window, will stomp on the current display
+    ; assumes bank 1 is active
     ; inputs
     ; A window ID,
     ; Carry - if set its the top window
@@ -283,12 +468,23 @@ private static void Proc()
         clc
         pla
 
-        rol ; * 8
+        rol ; * 16
+        rol
         rol
         rol
 
         tax
 
+        ; display source
+        lda #01
+        sta CTRL
+        lda window_data + window_vram_addr_offset, x
+        sta ADDRx_L
+        lda window_data + window_vram_addr_offset + 1, x
+        sta ADDRx_M
+        lda window_data + window_vram_addr_offset + 2, x
+        sta ADDRx_H
+    
         ; starting position
         stz CTRL
         lda window_data + window_left_offset, x
@@ -300,8 +496,8 @@ private static void Proc()
         sta ADDRx_M
 
         lda #$10
-        sta ADDRx_H
-    
+        sta ADDRx_H        
+
         OutputWindowTopLine();
 
         ; central lines
@@ -381,9 +577,12 @@ public static void OutputWindowLine()
 
     OutputCharacter(0x42, "window_bordercolour");
 
-    ; todo, fill in display data    
 .loop:
-    OutputCharacter(0x20, "window_bordercolour");
+    lda DATA1
+    sta DATA0
+    lda DATA1
+    sta DATA0
+    dey
     bne -loop
 
     OutputCharacter(0x42, "window_bordercolour");
