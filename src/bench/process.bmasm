@@ -11,8 +11,7 @@ private static void Setup()
 //  byte: Location of stack
 //  byte: Location of ZP data + registers
 */
-    .segment bench_process
-    .scope bitbench_process
+    .segment bench_process, scope=bench_process
     
     .process_data:
     for(var i = 0; i < 256/4; i++)
@@ -23,13 +22,12 @@ private static void Setup()
         .padvar byte data_block_@(i)
     }
 
-    .endscope
     .endsegment
 }
 
 private static void Proc()
 {
-    .scope bitbench_process
+    .scope bench_process
 
     .const PrimaryBank = 0
     .const State = 1           ; whether the process has been interrupted, or handed back control
@@ -58,15 +56,14 @@ private static void Proc()
 
     .endproc
 
-    .segment bench_general
-    .scope bitbench_process
+    .segment bench_general, scope=bench_process
 
     .padvar byte offset
     .padvar byte new_process
 
-    .endscope
     .endsegment
-    .scope bitbench_process
+
+    .scope bench_process
 
     // Create a process, allocate memory and setup stack
     // Input
@@ -104,7 +101,7 @@ private static void Proc()
         ; allocate stack block, A is number of blocks, X is process ID
         ldx new_process
         lda #1
-        jsr bitbench_memory:allocate_block
+        jsr bench_memory:allocate_block
         bcs error
         pha                                     ; stack block, to be returned in X
 
@@ -114,7 +111,7 @@ private static void Proc()
         ; allocation data block
         ldx new_process
         lda #1
-        jsr bitbench_memory:allocate_block
+        jsr bench_memory:allocate_block
         bcs error_pl
 
         tay                                     ; data block, returned value in Y
@@ -135,7 +132,7 @@ private static void Proc()
 
     .endproc
 
-    .scope bitbench_process
+    .scope bench_process
 
     // Input
     // A: Process ID
@@ -152,16 +149,14 @@ private static void Proc()
     .endproc
 
 
-    .segment bench_general
-    .scope bitbench_process
+    .segment bench_general, scope=bench_process
 
     .padvar byte new_bank
     .padvar byte new_process
 
-    .endscope
     .endsegment
 
-    .scope bitbench_process
+    .scope bench_process
 
     // load a new process, but not activate it. This should be done via the scheduler
     // Input:
@@ -175,12 +170,12 @@ private static void Proc()
         .const SETLFS = $FFBA
         .const LOAD = $FFD5
 
-        sta bitbench_zp:scratch
+        sta bench_zp:scratch
         lda ROM_BANK
         pha
         stz ROM_BANK                        ; switch to kernel as we use it to load
 
-        lda bitbench_zp:scratch
+        lda bench_zp:scratch
 
         ; parameters are in the form for SETNAM
         jsr SETNAM
@@ -194,7 +189,7 @@ private static void Proc()
         ; first find the bank where we will load to
         lda #1
         ldx #$fe                            ; temporary process ID
-        jsr bitbench_memory:allocate_bank
+        jsr bench_memory:allocate_bank
         bcs error
 
         sta new_bank                        ; bank number in A, store for later
@@ -217,7 +212,7 @@ private static void Proc()
         sta new_process                     ; store process ID to return it
         ldx new_bank
 
-        jsr bitbench_memory:update_bank     ; update the bank to the actual process ID
+        jsr bench_memory:update_bank     ; update the bank to the actual process ID
 
         lda RAM_BANK
         pha
@@ -290,7 +285,7 @@ private static void Proc()
         sta RAM_BANK
 
         lda new_process
-        jsr bitbench_scheduler:enable_process ; set the process to run and the required frames
+        jsr bench_scheduler:enable_process ; set the process to run and the required frames
         
         pla
         sta RAM_BANK                        ; restore original ROM Bank

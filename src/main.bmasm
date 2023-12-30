@@ -6,6 +6,7 @@ import Memory="bench\memory.bmasm";
 import ApiHelper="bench\apihelper.bmasm";
 import Switcher="bench\switcher.bmasm";
 import Scheduler="bench\scheduler.bmasm";
+import Window="bench\window.bmasm";
 
 .machine CommanderX16R42
     BM.X16Header();
@@ -22,22 +23,70 @@ import Scheduler="bench\scheduler.bmasm";
 
     jsr initialise
 
+    lda #$05
+    sta bench_window:window_top
+    sta bench_window:window_left
+    lda #$30
+    sta bench_window:window_width
+    lda #$10
+    sta bench_window:window_height
+    lda #<title
+    sta bench_window:window_title
+    lda #>title
+    sta bench_window:window_title + 1
+
+    jmp +skip
+.title:
+    BM.IsoPetscii("BITMAGIC");
+.skip:
+
+    lda #01
+    jsr bench_window:create_window
+    clc
+    jsr bench_window:draw_window
+
+
+    lda #$10
+    sta bench_window:window_top
+    sta bench_window:window_left
+    lda #$40
+    sta bench_window:window_width
+    lda #$20
+    sta bench_window:window_height
+    lda #<title2
+    sta bench_window:window_title
+    lda #>title2
+    sta bench_window:window_title + 1
+
+    jmp +skip
+.title2:
+    BM.IsoPetscii("ZP RAM");
+.skip:
+
+    lda #01
+    jsr bench_window:create_window
+    sec
+    jsr bench_window:draw_window
+
+
     lda #11
     ldx #<filename
     ldy #>filename
-    jsr bitbench_process:load
+    jsr bench_process:load
 
     lda #12
     ldx #<filename2
     ldy #>filename2
-    jsr bitbench_process:load
+    jsr bench_process:load
 
     cli
 
-    .loop: 
+.loop: 
     jmp loop
 
-    .proc initialise
+
+
+    .proc initialise     
 
         cld
 
@@ -47,10 +96,11 @@ import Scheduler="bench\scheduler.bmasm";
         sta IEN         ; vsync interrupt only
         stz CTRL
 
-        jsr bitbench_memory:initialise
-        jsr bitbench_scheduler:initialise
-        jsr bitbench_process:initialise
-        jsr bitbench_switcher:initialise
+        jsr bench_window:initialise
+        jsr bench_memory:initialise
+        jsr bench_scheduler:initialise
+        jsr bench_process:initialise
+        jsr bench_switcher:initialise
 
         jsr override_irq
 
@@ -118,12 +168,12 @@ import Scheduler="bench\scheduler.bmasm";
         lda #1          ; Bench uses bank 1.
         sta RAM_BANK 
 
-        jsr bitbench_scheduler:reset    ; reset scheduler for the frame
-        jsr bitbench_scheduler:get_next_process ; returns 0 if nothing to do
+        jsr bench_scheduler:reset    ; reset scheduler for the frame
+        jsr bench_scheduler:get_next_process ; returns 0 if nothing to do
 
         beq nothing_to_do               
 
-        jsr bitbench_switcher:activate_process_interrupt 
+        jsr bench_switcher:activate_process_interrupt 
 
         ; stack here will always have these values even if switched
         pla 
@@ -143,7 +193,7 @@ import Scheduler="bench\scheduler.bmasm";
         jmp brk_hit    
 
     .nothing_to_do:
-        jsr bitbench_switcher:store_process
+        jsr bench_switcher:store_process
         ; set the return value to the idle loop sprocs
         ; empty the stack, and push a dummy entry
         ldx #$fe

@@ -1,0 +1,429 @@
+library BitBench.Window.Manager;
+
+import Init="initialisation.bmasm";
+
+private static byte BorderColour = 0xa9;
+private static byte InactiveBorderColour = 0xa7;
+private static byte WindowText = 0x0f;
+
+private static void Setup()
+{
+    ; VRAM Map
+    ; Tilemap starts at $00000
+
+    .segment bench_window, scope=bench_window
+
+    .constvar byte window_width = $02
+    .constvar byte window_height = $03
+    .constvar byte window_top = $04
+    .constvar byte window_left = $05
+    .constvar ushort window_title = $06
+    
+    .constvar byte window_bordercolour = $02
+
+    .const SCREEN_MODE = $ff5f
+    .const MOUSE_CONFIG = $ff68
+    
+    .const border_colour = @(BorderColour)
+    .const inactive_border_colour = @(InactiveBorderColour)
+    .const window_text = @(WindowText)
+
+    .const window_width_offset = 0
+    .const window_height_offset = 1
+    .const window_top_offset = 2
+    .const window_left_offset = 3
+    .const window_title_offset = 4
+    .const window_zorder_offset = 6
+    .const window_processid_offset = 7
+
+    .const max_windows = 16
+
+    .window_data:
+     for(var i = 0; i < 16; i++)
+     {
+        .padvar byte width_@(i)
+        .padvar byte height_@(i)
+        .padvar byte top_@(i)
+        .padvar byte left_@(i)
+        .padvar ushort title_@(i)
+        .padvar byte zorder_@(i)
+        .padvar byte process_id_@(i)
+     }
+
+    .endsegment
+}
+
+private static void Proc()
+{
+    .scope bench_window
+
+    .const screensize = 960
+
+    .proc initialise
+
+        ; setup display
+
+        ; disable layer 0
+        stz CTRL
+        lda DC_VIDEO
+        and #0b11101111
+        sta DC_VIDEO
+
+        lda #$68     ; 128x64 1bpp 256C
+        sta L1_CONFIG
+
+        stz L1_MAPBASE  ; set mapbase to 0
+
+        ; clear vram from start of layer 1
+        stz ADDRx_L
+        stz ADDRx_M
+        lda #$10
+        sta ADDRx_H
+
+        ; write to data0 128*60*2/16=960 times.
+        ldx #<screensize
+        ldy #(>screensize)+1
+    .loop:
+
+        stz DATA0
+        stz DATA0
+        stz DATA0
+        stz DATA0
+        stz DATA0
+        stz DATA0
+        stz DATA0
+        stz DATA0
+        stz DATA0
+        stz DATA0
+        stz DATA0
+        stz DATA0
+        stz DATA0
+        stz DATA0
+        stz DATA0
+        stz DATA0
+        stz DATA0
+
+        dex
+        bne -loop
+        dey
+        beq done
+        ldx #$ff
+        jmp -loop
+
+    .done:
+        ; enable the mouse
+        sec
+        jsr SCREEN_MODE
+        lda #1              ; mouse visible
+        jsr MOUSE_CONFIG
+
+        ; clear memory, only need to clear process id
+        ldx #0
+        ldy #max_windows
+    .loop:
+        stz window_data + window_processid_offset, x
+        
+        clc
+        txa
+        adc #8
+        tax
+
+        dey
+        bne -loop
+
+        rts
+
+    .endproc
+
+    ; ** can be called by applications **
+    ; creates a window and sets it to the lowest Z Order so it is displayed
+    ; parameters are passed via the ZP values
+    ; byte window_width
+    ; byte window_height
+    ; byte window_top
+    ; byte window_left
+    ; ushort window_title, pointer to null terminated string.
+    ; also uses these registers
+    ; A: process ID
+    ; returns
+    ; A: window ID
+    ; carry set on error, eg too many windows or out of memory
+    .proc create_window
+        ; loop through the window list looking for a empty slot.
+        ; adjust zorder by one as we go
+
+        ldy #0
+        pha
+        ldx #0
+
+        lda RAM_BANK
+        sta bench_general:return_rambank
+
+    .loop:
+        lda window_data + window_processid_offset, x
+        beq found_position
+
+        iny
+        cpy #max_windows + 1
+        beq error_no_space
+
+        clc
+        txa
+        adc #8
+        tax
+
+        lda window_data + window_processid_offset, x
+        bne -loop       ; only inc windows with a process id
+        inc window_data + window_zorder_offset, x
+
+        jmp -loop
+
+    .found_position:
+        pla
+        phy
+        ; y now has the window ID, X the offset
+        sta window_data + window_processid_offset, x   
+
+        lda window_width
+        sta window_data + window_width_offset, x   
+
+        lda window_height
+        sta window_data + window_height_offset, x   
+
+        lda window_top
+        sta window_data + window_top_offset, x   
+
+        lda window_left
+        sta window_data + window_left_offset, x
+
+        stz window_data + window_zorder_offset, x
+
+        lda window_title
+        sta window_data + window_title_offset, x   
+        lda window_title + 1
+        sta window_data + window_title_offset + 1, x   
+
+    .loop:
+        cpy #max_windows + 1
+        beq done
+        
+        iny
+        clc
+        txa
+        adc #8
+        tax
+
+        lda window_data + window_processid_offset, x
+        beq -loop       ; only inc windows with a process id
+        inc window_data + window_zorder_offset, x
+
+        jmp -loop
+
+    .done:
+        lda bench_general:return_rambank
+        sta RAM_BANK
+
+        pla
+        clc
+        rts
+
+    .error_no_space:
+        lda bench_general:return_rambank
+        sta RAM_BANK
+
+        pla
+        sec        
+        rts
+
+    .endproc
+
+    ; ** can be called by applications **
+    ; marks a window as closed, doesn't perform any checks
+    ; inputs:
+    ; A: window ID
+    .proc close_window
+
+        ldx RAM_BANK
+        stx bench_general:return_rambank
+
+        clc
+
+        rol ; * 8
+        rol
+        rol
+
+        tax
+
+        stz window_data + window_processid_offset, x
+
+        lda bench_general:return_rambank
+        sta RAM_BANK
+
+        rts
+        
+    .endproc
+
+    ; draw window, will stomp on the current display
+    ; inputs
+    ; A window ID,
+    ; Carry - if set its the top window
+    .proc draw_window
+        pha
+
+        bcc not_top
+
+        lda #border_colour
+        jmp draw_start
+    .not_top:
+        lda #inactive_border_colour
+        
+    .draw_start:
+        sta window_bordercolour
+
+        clc
+        pla
+
+        rol ; * 8
+        rol
+        rol
+
+        tax
+
+        ; starting position
+        stz CTRL
+        lda window_data + window_left_offset, x
+        clc
+        rol
+        sta ADDRx_L
+
+        lda window_data + window_top_offset, x
+        sta ADDRx_M
+
+        lda #$10
+        sta ADDRx_H
+    
+        OutputWindowTopLine();
+
+        ; central lines
+        lda window_data + window_height_offset, x
+        dec
+        dec
+        tay
+    .line_loop:
+        phy
+
+        lda window_data + window_left_offset, x
+        clc
+        rol
+        sta ADDRx_L
+        inc ADDRx_M
+
+        OutputWindowLine();
+
+        ply
+        dey
+        bne -line_loop
+
+        ; bottom line
+        lda window_data + window_left_offset, x
+        clc
+        rol
+        sta ADDRx_L
+        inc ADDRx_M
+
+        OutputWindowBottomLine();
+
+        rts
+
+    .endproc
+
+    .endscope
+}
+
+public static void OutputWindowTopLine()
+{
+    lda window_data + window_width_offset, x
+    tay
+    dey     ; we look for 0 one ahead to draw the corner
+
+    OutputCharacter(0x55, "window_bordercolour");
+    OutputCharacter(0x40, "window_bordercolour");
+    OutputCharacter(0x73, "window_bordercolour");
+
+    lda window_data + window_title_offset, x
+    sta bench_general:zp_pointer
+    lda window_data + window_title_offset + 1, x
+    sta bench_general:zp_pointer + 1
+    
+.loop:
+    lda (bench_general:zp_pointer)
+    beq +done
+    OutputCharacterA("#window_text");
+    inc bench_general:zp_pointer
+
+    jmp -loop
+
+.done:
+    OutputCharacter(0x6b, "window_bordercolour");
+
+.loop:
+    OutputCharacter(0x40, "window_bordercolour");
+    bne -loop
+
+    OutputCharacter(0x49, "window_bordercolour");
+}
+
+public static void OutputWindowLine()
+{
+    lda window_data + window_width_offset, x
+    tay
+    dey
+
+    OutputCharacter(0x42, "window_bordercolour");
+
+    ; todo, fill in display data    
+.loop:
+    OutputCharacter(0x20, "window_bordercolour");
+    bne -loop
+
+    OutputCharacter(0x42, "window_bordercolour");
+}
+
+public static void OutputWindowBottomLine()
+{
+    lda window_data + window_width_offset, x
+    tay
+    dey
+
+    OutputCharacter(0x4a, "window_bordercolour");
+    
+.loop:
+    OutputCharacter(0x40, "window_bordercolour");
+    bne -loop
+
+    OutputCharacter(0x4b, "window_bordercolour");
+}
+
+public static void OutputCharacter(byte tile, string colour)
+{
+    lda #@(tile)
+    sta DATA0
+    lda @(colour)
+    sta DATA0
+    dey
+}
+
+public static void OutputCharacterA( string colour)
+{
+    sta DATA0
+    lda @(colour)
+    sta DATA0
+    dey
+}
+
+public override void Initialise()
+{
+    Init.Add(Proc);
+    Setup();
+}
+

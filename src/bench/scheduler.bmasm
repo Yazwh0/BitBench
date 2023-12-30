@@ -13,8 +13,7 @@ private static void Setup()
 //    byte: Hold
 */
 
-    .segment bench_scheduler
-    .scope bitbench_scheduler
+    .segment bench_scheduler, scope=bench_scheduler
 
     .const WakeCount = 0
     .const Required = 1
@@ -32,11 +31,10 @@ private static void Setup()
         .padvar byte hold_@(i)
     }
 
-    .endscope
     .endsegment
 
     .segment bench_general
-    .scope bitbench_scheduler
+    .scope bench_scheduler
 
     .padvar byte state              ; if we're looking for 'realtime' processes or not
     .padvar byte process_toreturn
@@ -53,7 +51,7 @@ private static void Setup()
 
 private static void Proc()
 {
-    .scope bitbench_scheduler
+    .scope bench_scheduler
 
     .proc initialise
  

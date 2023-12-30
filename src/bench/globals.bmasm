@@ -11,9 +11,9 @@ private static void Setup()
     .segment bench_general $a300 $100
     .segment bench_process $a400 $100
     .segment bench_app_header $a000 $100
+    .segment bench_window $a500 $100
 
-    .segment bench_zp
-    .scope bench_general
+    .segment bench_zp, scope=bench_general
 
     .const application_entry_l $a010
     .const application_entry_h $a011
@@ -25,10 +25,13 @@ private static void Setup()
     .padvar ushort zp_pointer
     .padvar ushort zp_pointer2
 
-    .endscope
     .endsegment
 
+    .segment bench_general, scope=bench_general
 
+    .padvar byte return_rambank
+
+    .endsegment
 }
 
 public override void Initialise()

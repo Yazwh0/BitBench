@@ -7,8 +7,8 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="BitMagic.X16Emulator" Version="0.0.24-alpha" />
-    <PackageReference Include="BitMagic.X16Emulator.TestHelper" Version="0.0.24-alpha" />
+    <PackageReference Include="BitMagic.X16Emulator" Version="0.0.25-alpha" />
+    <PackageReference Include="BitMagic.X16Emulator.TestHelper" Version="0.0.25-alpha" />
     <PackageReference Include="Microsoft.CodeAnalysis" Version="4.7.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.3.2" />
     <PackageReference Include="MSTest.TestAdapter" Version="2.2.10" />

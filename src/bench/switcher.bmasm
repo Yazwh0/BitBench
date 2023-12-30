@@ -4,12 +4,12 @@ import Init="initialisation.bmasm";
 
 private static void Setup()
 {
-    .segment bench_general
-    .scope bitbench_switcher
+    .segment bench_general, scope=bench_switcher
+
     .padvar byte current_process
     .padvar byte next_process
     .padvar short return_address
-    .endscope
+
     .endsegment
 }
 
@@ -24,7 +24,7 @@ private static void Proc()
     // Ram Bank
     // Rom Bank
 
-    .scope bitbench_switcher
+    .scope bench_switcher
     
     .proc initialise
 
@@ -155,15 +155,15 @@ public static void SetZpPointersRamBankToCurrentProcess()
     rol 
     rol     ; * 4
     tax
-    lda bitbench_process:process_data + bitbench_process:StackBlock, x
+    lda bench_process:process_data + bench_process:StackBlock, x
     sta bench_general:zp_pointer + 1
     stz bench_general:zp_pointer
 
-    lda bitbench_process:process_data + bitbench_process:DataBlock, x
+    lda bench_process:process_data + bench_process:DataBlock, x
     sta bench_general:zp_pointer2 + 1
     stz bench_general:zp_pointer2
 
-    lda bitbench_process:process_data + bitbench_process:PrimaryBank, x
+    lda bench_process:process_data + bench_process:PrimaryBank, x
     sta RAM_BANK                            ; fetch primary bank and switch
 }
 
