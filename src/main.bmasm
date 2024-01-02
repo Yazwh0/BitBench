@@ -1,5 +1,5 @@
 import BM="bench\BM.bmasm";
-import Globals="bench\globals.bmasm";
+import Global="bench\globals.bmasm";
 import Init="bench\initialisation.bmasm";
 import Process="bench\process.bmasm";
 import Memory="bench\memory.bmasm";
@@ -49,7 +49,7 @@ import Window="bench\window.bmasm";
     lda #$10
     sta bench_window:window_top
     sta bench_window:window_left
-    lda #$40
+    lda #$3c
     sta bench_window:window_width
     lda #$20
     sta bench_window:window_height
@@ -68,16 +68,40 @@ import Window="bench\window.bmasm";
     sec
     jsr bench_window:draw_window
 
+    lda #$3
+    sta bench_window:window_top
+    lda #$27
+    sta bench_window:window_left
+    lda #$10
+    sta bench_window:window_width
+    lda #$30
+    sta bench_window:window_height
+    lda #<title3
+    sta bench_window:window_title
+    lda #>title3
+    sta bench_window:window_title + 1
+
+    jmp +skip
+ .title3:
+     BM.IsoPetscii("STATUS");
+ .skip:
+
+    lda #01
+    jsr bench_window:create_window
+    sec
+    jsr bench_window:draw_window
+
+
 
     lda #11
     ldx #<filename
     ldy #>filename
-    jsr bench_process:load
+    ;jsr bench_process:load
 
     lda #12
     ldx #<filename2
     ldy #>filename2
-    jsr bench_process:load
+    ;jsr bench_process:load
 
     cli
 
@@ -142,6 +166,9 @@ import Window="bench\window.bmasm";
         phy
         phx
 
+        lda #$d
+        sta DC_BORDER
+
         ; check if its a brk
         tsx
         lda $106, x     ; +3 for stack pointer, plus three above 
@@ -164,13 +191,55 @@ import Window="bench\window.bmasm";
         jsr SCNKEY
         ; clock_update isn't exposed so cannot call 
 
+        lda #05
+        sta DC_BORDER
+
         ; fetch and store mouse movement
+        lda bench_general:mouse_buttons
+        sta bench_general:prev_mouse_buttons
+        
+        lda bench_general:mouse_x
+        sta bench_general:prev_mouse_x
+        lda bench_general:mouse_y
+        sta bench_general:prev_mouse_y
+
         ldx #bench_general:mouse_x
         jsr mouse_get
         sta bench_general:mouse_buttons
 
+        ; convert mouse pixel pos to tile pos, div 8
+        clc
+        lda bench_general:mouse_x
+        ror bench_general:mouse_x + 1
+        ror 
+        clc
+        ror bench_general:mouse_x + 1
+        ror
+        clc
+        ror bench_general:mouse_x + 1
+        ror
+        sta bench_general:mouse_x
+
+        clc
+        lda bench_general:mouse_y
+        ror bench_general:mouse_y + 1
+        ror
+        clc
+        ror bench_general:mouse_y + 1
+        ror
+        clc
+        ror bench_general:mouse_y + 1
+        ror
+        sta bench_general:mouse_y
+
         jsr GETIN
-        sta bench_general:keyboard ; todo, if non-zero, send message to active window.
+        sta bench_general:keyboard ; todo, if non-zero, send message to active window, like mouse moves
+
+        ; handle mouse movement
+        Global.Call_HandleMouse();
+
+        lda #01
+        sta DC_BORDER
 
         ; check if we need to switch process
         lda #1          ; Bench uses bank 1.
@@ -188,6 +257,8 @@ import Window="bench\window.bmasm";
         sta ROM_BANK
         pla
         sta RAM_BANK
+
+        stz DC_BORDER
 
         plx
         ply
@@ -213,6 +284,8 @@ import Window="bench\window.bmasm";
         pha
         lda #0
         pha     ; cpu flags
+
+        stz DC_BORDER
 
         rti        
     .endproc

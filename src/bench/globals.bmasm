@@ -2,6 +2,8 @@ library BitBench.Globals.Manager;
 
 import Init="initialisation.bmasm";
 
+private static HashSet<string> _mouse = new();
+
 private static void Setup()
 {
     ; define segment ranges
@@ -35,9 +37,25 @@ private static void Setup()
     .padvar ushort mouse_x
     .padvar ushort mouse_y
     .padvar byte mouse_buttons
+    .padvar byte prev_mouse_x
+    .padvar byte prev_mouse_y
+    .padvar byte prev_mouse_buttons
     .padvar byte keyboard
 
-    .endsegment    
+    .endsegment
+}
+
+public static void Call_HandleMouse()
+{
+    foreach(var callback in _mouse)
+    {
+        jsr @(callback)
+    }
+}
+
+public static void AddMouseHandler(string name)
+{    
+    _mouse.Add(name);
 }
 
 public override void Initialise()

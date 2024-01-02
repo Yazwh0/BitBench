@@ -1,6 +1,7 @@
 library BitBench.Window.Manager;
 
 import Init="initialisation.bmasm";
+import Global="globals.bmasm";
 
 private static byte BorderColour = 0xa9;
 private static byte InactiveBorderColour = 0xa7;
@@ -16,6 +17,7 @@ private static void Setup()
 
     .segment bench_window, scope=bench_window
 
+    ; todo, change the order of these to match the other ordering
     .constvar byte window_width = $02
     .constvar byte window_height = $03
     .constvar byte window_left = $04
@@ -67,8 +69,11 @@ private static void Setup()
     .padvar byte vram_addr_l
     .padvar byte vram_addr_m
     .padvar byte vram_addr_h
+    .padvar byte current_window
 
     .endsegment
+
+    Global.AddMouseHandler("bench_window:mouse_move");
 }
 
 private static void Proc()
@@ -97,6 +102,16 @@ private static void Proc()
         stz ADDRx_M
         lda #$10
         sta ADDRx_H
+
+        lda #2
+        sta CTRL
+
+        lda #$9e
+        sta DC_HSTOP
+
+        stz CTRL
+    
+        stz current_window
 
         ; write to data0 128*60*2/16=960 times.
         ldx #<screensize
@@ -447,6 +462,88 @@ private static void Proc()
 
     .endproc
 
+    ; mark the window in A to be the top of the window map
+    ; * CHANGES BANK *
+    ; inputs:
+    ; A: window ID
+    .proc map_window_to_top
+
+        .const top = bench_general:zp_pointer+1
+        .const left = bench_general:zp_pointer
+        .const width = bench_general:zp_pointer2
+        .const height = bench_general:zp_pointer2+1
+    
+        pha
+    
+        clc
+        rol ;* 16
+        rol
+        rol
+        rol
+
+        tax
+
+        lda window_data + window_top_offset, x   
+        sta top
+        lda window_data + window_left_offset, x
+        sta left
+        lda window_data + window_width_offset, x
+        sta width
+        lda window_data + window_height_offset, x
+        sta height
+
+        lda #bench_general:bank_windowmap
+        sta RAM_BANK
+ 
+        ; use top\left parameters as a pointer
+        lda top
+
+        clc
+        rol left
+        clc
+        ror
+        ror left
+
+        clc
+        adc #$a0
+        sta top
+        ; left, top should now point to the location in the window map
+
+        pla             ; get window id
+        pha 
+
+        ldx height
+        ldy width
+    .loop:
+        dey
+        sta (bench_general:zp_pointer), y
+        bne -loop
+
+        dex
+        beq +done
+
+        pha
+        clc
+        lda left
+        adc #$80
+        sta left
+        lda top
+        adc #0
+        sta top
+        pla
+
+        ldy width
+        iny
+    
+        jmp -loop
+
+    .done:
+        pla
+
+        rts
+
+    .endproc
+
     ; draw window, will stomp on the current display
     ; assumes bank 1 is active
     ; inputs
@@ -528,6 +625,84 @@ private static void Proc()
         inc ADDRx_M
 
         OutputWindowBottomLine();
+
+        rts
+
+    .endproc
+
+    .proc mouse_move
+
+        ; check if click has occured and if so, switch focus
+
+        lda bench_general:mouse_buttons
+        and #01 ; left mouse button
+        bne mouse_is_down
+
+    .done:
+        rts
+
+    .mouse_is_down:
+
+        eor bench_general:prev_mouse_buttons
+        and #01
+        beq -done
+
+        ; get window id
+        lda RAM_BANK
+        pha
+
+        lda #bench_general:bank_windowmap
+        sta RAM_BANK
+
+        lda bench_general:mouse_x
+        clc
+        rol
+        sta bench_general:zp_pointer
+
+        clc
+        lda bench_general:mouse_y
+        ror
+        ror bench_general:zp_pointer
+        adc #$a0
+        sta bench_general:zp_pointer+1
+
+        lda (bench_general:zp_pointer)
+        bmi +done
+
+        ldx #bench_general:bank_bench
+        stx RAM_BANK
+
+        cmp current_window
+        beq +done
+        
+        pha
+
+        ; old window
+        lda current_window
+        ; call blur
+
+        clc
+        jsr draw_window
+
+        ; new focus
+        pla
+        ; call focus
+
+        sta current_window
+
+        sec
+        jsr draw_window
+
+        lda #bench_general:bank_bench
+        sta RAM_BANK
+
+        pla
+        pha
+        jsr map_window_to_top
+
+    .done:
+        pla
+        sta RAM_BANK
 
         rts
 
