@@ -3,7 +3,8 @@ import BM="BM.bmasm";
 library BitBench.ApiHelper.Manager;
 
 public static void Header(string name, 
-    string entry_vector_label, string close_vector_label, string focus_vector_label,
+    string entry_vector_label, string close_vector_label, 
+    string focus_vector_label, string blur_vector_label,
     byte frameUpdate, byte zpRequireCount)
 {
     if (name.Length > 16)
@@ -11,13 +12,17 @@ public static void Header(string name,
 
     BM.IsoPetscii(name.PadRight(16, ' '), false);
     .entry_vector:
-    .word @(entry_vector_label)
+        .word @(entry_vector_label)
     .close_vector:
-    .word @(close_vector_label)
+        jmp @(close_vector_label)
     .focus_vector:
-    .word @(focus_vector_label)
+        jmp @(focus_vector_label)
+    .blur_vector:
+        jmp @(blur_vector_label)
     .requested_frame_update:
-    .byte @(frameUpdate)
+        .byte @(frameUpdate)
     .required_zp_count:
-    .byte @(zpRequireCount)
+        .byte @(zpRequireCount)
+    .process_id:
+        .byte $00
 }

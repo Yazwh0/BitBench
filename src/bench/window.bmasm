@@ -5,7 +5,8 @@ import Global="globals.bmasm";
 
 private static byte BorderColour = 0xa9;
 private static byte InactiveBorderColour = 0xa7;
-private static byte WindowText = 0x0f;
+private static byte WindowText = 0x01;
+private static byte InactiveWindowText = 0x0c;
 
 private static void Setup()
 {
@@ -25,6 +26,7 @@ private static void Setup()
     .constvar ushort window_title = $06
     
     .constvar byte window_bordercolour = $02
+    .constvar byte window_textcolour = $03
 
     .const SCREEN_MODE = $ff5f
     .const MOUSE_CONFIG = $ff68
@@ -32,6 +34,7 @@ private static void Setup()
     .const border_colour = @(BorderColour)
     .const inactive_border_colour = @(InactiveBorderColour)
     .const window_text = @(WindowText)
+    .const inactive_window_text = @(InactiveWindowText)
 
     .const window_width_offset = 0
     .const window_height_offset = 1
@@ -42,7 +45,7 @@ private static void Setup()
     .const window_processid_offset = 7
     .const window_vram_addr_offset = 8
     .const window_vram_len_offset = 11
-    .const window_padding1_offset = 13
+    .const window_title_bank_offset = 13
     .const window_padding2_offset = 14
     .const window_padding3_offset = 15
 
@@ -61,7 +64,7 @@ private static void Setup()
         .padvar ushort vram_addr_@(i)
         .padvar byte vram_addrh_@(i)
         .padvar ushort vram_addr_@(i)
-        .padvar byte padding1_@(i)
+        .padvar byte title_bank_@(i)
         .padvar byte padding2_@(i)
         .padvar byte padding3_@(i)
     }
@@ -80,10 +83,9 @@ private static void Proc()
 {
     .scope bench_window
 
-    .const screensize = 960
-
     .proc initialise
 
+        .const screensize = 960
         ; setup display
 
         ; disable layer 0
@@ -287,7 +289,10 @@ private static void Proc()
         lda window_title
         sta window_data + window_title_offset, x   
         lda window_title + 1
-        sta window_data + window_title_offset + 1, x   
+        sta window_data + window_title_offset + 1, x  
+
+        lda bench_general:return_rambank
+        sta window_data + window_title_bank_offset, x
 
         phx
 
@@ -555,12 +560,18 @@ private static void Proc()
         bcc not_top
 
         lda #border_colour
+        sta window_bordercolour
+        lda #window_text
+        sta window_textcolour
+
         jmp draw_start
     .not_top:
         lda #inactive_border_colour
+        sta window_bordercolour
+        lda #inactive_window_text
+        sta window_textcolour
         
     .draw_start:
-        sta window_bordercolour
 
         clc
         pla
@@ -675,20 +686,59 @@ private static void Proc()
         cmp current_window
         beq +done
         
-        pha
+        pha ; store window ID
 
         ; old window
         lda current_window
+
         ; call blur
+        ; first get process ID, so we can get the RAM Bank to call blur()
+        clc
+        rol ; * 16
+        rol
+        rol
+        rol
+        tax
+
+        lda window_data + window_processid_offset, x
+
+        jsr bench_process:get_bank
+        sta RAM_BANK
+
+        jsr bench_general:application_blur
+
+        lda #bench_general:bank_bench
+        sta RAM_BANK
+
+        ; updated blurred window
+        lda current_window
 
         clc
         jsr draw_window
 
         ; new focus
-        pla
+        pla ; get window ID
+        
         ; call focus
-
         sta current_window
+
+        clc
+        rol ; * 16
+        rol
+        rol
+        rol
+        tax
+
+        lda window_data + window_processid_offset, x
+
+        jsr bench_process:get_bank
+        sta RAM_BANK
+
+        jsr bench_general:application_focus
+
+        lda #bench_general:bank_bench
+        sta RAM_BANK
+        lda current_window
 
         sec
         jsr draw_window
@@ -696,8 +746,7 @@ private static void Proc()
         lda #bench_general:bank_bench
         sta RAM_BANK
 
-        pla
-        pha
+        lda current_window
         jsr map_window_to_top
 
     .done:
@@ -726,15 +775,23 @@ public static void OutputWindowTopLine()
     lda window_data + window_title_offset + 1, x
     sta bench_general:zp_pointer + 1
     
+    lda RAM_BANK
+    pha
+    lda window_data + window_title_bank_offset, x
+    sta RAM_BANK
+
 .loop:
     lda (bench_general:zp_pointer)
     beq +done
-    OutputCharacterA("#window_text");
+    OutputCharacterA("window_textcolour");
     inc bench_general:zp_pointer
 
     jmp -loop
 
 .done:
+    pla
+    sta RAM_BANK
+
     OutputCharacter(0x6b, "window_bordercolour");
 
 .loop:

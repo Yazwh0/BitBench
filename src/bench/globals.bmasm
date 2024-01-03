@@ -20,10 +20,14 @@ private static void Setup()
     ; todo, match these with the api helper
     .const application_entry_l $a010
     .const application_entry_h $a011
-    .const application_close_l $a012
-    .const application_close_h $a013
-    .const application_frame_update $a014
-    .const application_zp_count $a015
+
+    .const application_close $a012   ; jmp <address>
+    .const application_focus $a015  
+    .const application_blur $a018
+
+    .const application_frame_update $a01b
+    .const application_zp_count $a01c
+    .const application_processid $a01d
 
     .const bank_kernel = $00
     .const bank_bench = $01

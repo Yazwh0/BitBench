@@ -199,6 +199,7 @@ private static void Proc()
 
     .error:                                 ; out of memory
         pla
+        pla
         sec
         rts
  
@@ -210,6 +211,7 @@ private static void Proc()
         ;stz bench_general:zp_pointer2      ; not needed, as overriden later
 
         sta new_process                     ; store process ID to return it
+        pha
         ldx new_bank
 
         jsr bench_memory:update_bank     ; update the bank to the actual process ID
@@ -224,6 +226,9 @@ private static void Proc()
         ldy #>$a000
         jsr LOAD 
         bcs error_pl
+
+        pla
+        sta bench_general:application_processid
 
         ; setup stack, (bitbench_zp:zp_pointer) is a pointer to the stack block
         ; intial stack should be entryaddress, CPU flags, A, X, Y, rom_bank, ram_bank, stack_pointer
@@ -299,7 +304,27 @@ private static void Proc()
 
         .error_pl:
         pla
+        pla
     .endproc
+
+    ; returns the primary bank for the process in A
+    ; inputs:
+    ; A: ProcessId
+    ; returns:
+    ; A: BankId
+    .proc get_bank
+
+        clc
+        rol ; * 4
+        rol
+        tax
+
+        lda process_data + PrimaryBank, x
+
+        rts
+
+    .endproc
+
 
     .endscope
 }

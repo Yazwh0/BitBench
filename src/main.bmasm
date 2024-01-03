@@ -23,85 +23,38 @@ import Window="bench\window.bmasm";
 
     jsr initialise
 
-    lda #$05
-    sta bench_window:window_top
-    sta bench_window:window_left
-    lda #$30
-    sta bench_window:window_width
-    lda #$10
-    sta bench_window:window_height
-    lda #<title
-    sta bench_window:window_title
-    lda #>title
-    sta bench_window:window_title + 1
+;     lda #$3
+;     sta bench_window:window_top
+;     lda #$27
+;     sta bench_window:window_left
+;     lda #$10
+;     sta bench_window:window_width
+;     lda #$30
+;     sta bench_window:window_height
+;     lda #<title3
+;     sta bench_window:window_title
+;     lda #>title3
+;     sta bench_window:window_title + 1
 
-    jmp +skip
-.title:
-    BM.IsoPetscii("BITMAGIC");
-.skip:
+;     jmp +skip
+;  .title3:
+//      BM.IsoPetscii("STATUS");
+;  .skip:
 
-    lda #01
-    jsr bench_window:create_window
-    clc
-    jsr bench_window:draw_window
-
-
-    lda #$10
-    sta bench_window:window_top
-    sta bench_window:window_left
-    lda #$3c
-    sta bench_window:window_width
-    lda #$20
-    sta bench_window:window_height
-    lda #<title2
-    sta bench_window:window_title
-    lda #>title2
-    sta bench_window:window_title + 1
-
-    jmp +skip
- .title2:
-     BM.IsoPetscii("ZP RAM");
- .skip:
-
-    lda #01
-    jsr bench_window:create_window
-    sec
-    jsr bench_window:draw_window
-
-    lda #$3
-    sta bench_window:window_top
-    lda #$27
-    sta bench_window:window_left
-    lda #$10
-    sta bench_window:window_width
-    lda #$30
-    sta bench_window:window_height
-    lda #<title3
-    sta bench_window:window_title
-    lda #>title3
-    sta bench_window:window_title + 1
-
-    jmp +skip
- .title3:
-     BM.IsoPetscii("STATUS");
- .skip:
-
-    lda #01
-    jsr bench_window:create_window
-    sec
-    jsr bench_window:draw_window
-
-
+;     lda #01
+;     jsr bench_window:create_window
+;     sec
+;     jsr bench_window:draw_window
 
     lda #11
     ldx #<filename
     ldy #>filename
-    ;jsr bench_process:load
+    jsr bench_process:load
 
     lda #12
     ldx #<filename2
     ldy #>filename2
-    ;jsr bench_process:load
+    jsr bench_process:load
 
     cli
 
@@ -242,7 +195,7 @@ import Window="bench\window.bmasm";
         sta DC_BORDER
 
         ; check if we need to switch process
-        lda #1          ; Bench uses bank 1.
+        lda #bench_general:bank_bench  ; Bench uses bank 1.
         sta RAM_BANK 
 
         jsr bench_scheduler:reset    ; reset scheduler for the frame
@@ -310,12 +263,32 @@ import Window="bench\window.bmasm";
     .endscope
     .endsegment
 
-    .segment testapp $a000 $2000 TESTAPP.BIN
-    ApiHelper.Header("TEST", "entry", "exit", "focus", 1, 1);
+    .segment testapp $a000 $2000 TESTAPP.BIN testapp
+    ApiHelper.Header("TEST", "entry", "exit", "focus", "blur", 1, 1);
 
     .entry:    
-        nop
-        stz $02
+        lda #$05
+        sta bench_window:window_top
+        sta bench_window:window_left
+        lda #$30
+        sta bench_window:window_width
+        lda #$10
+        sta bench_window:window_height
+        lda #<title
+        sta bench_window:window_title
+        lda #>title
+        sta bench_window:window_title + 1
+
+        jmp +skip
+    .title:
+        BM.IsoPetscii("PROCESS 1");
+    .skip:
+
+        lda bench_general:application_processid
+        jsr bench_window:create_window
+        ;clc
+        ;jsr bench_window:draw_window
+
     .loop:
         jsr test_proc
         inc $02
@@ -332,29 +305,58 @@ import Window="bench\window.bmasm";
     .focus:
         rts
 
+    .blur:
+        rts
+
     .endsegment
 
-    .segment testapp2 $a000 $2000 TESTAPP2.BIN
-    ApiHelper.Header("TEST2", "entry2", "exit2", "focus2", 1, 1);
+    .segment testapp2 $a000 $2000 TESTAPP2.BIN testapp2
+    ApiHelper.Header("TEST2", "entry", "exit", "focus", "blur", 1, 1);
 
     .byte 1, 2, 3, 4, 5
-    .entry2:
+    .entry:
+
+        lda #$10
+        sta bench_window:window_top
+        sta bench_window:window_left
+        lda #$3c
+        sta bench_window:window_width
+        lda #$20
+        sta bench_window:window_height
+        lda #<title2
+        sta bench_window:window_title
+        lda #>title2
+        sta bench_window:window_title + 1
+
+        jmp +skip
+    .title2:
+        BM.IsoPetscii("PROCESS 2");
+    .skip:
+
+        lda bench_general:application_processid
+        jsr bench_window:create_window
+        ;sec
+        ;jsr bench_window:draw_window
+
         nop
         stz $03
-    .loop2:
-        jsr test_proc2
+    .loop:
+        jsr test_proc
         inc $03
-        jmp loop2
+        jmp loop
 
-    .proc test_proc2
+    .proc test_proc
         wai
         rts
     .endproc
 
-    .exit2:
+    .exit:
         rts
 
-    .focus2:
+    .focus:
+        rts
+
+    .blur:
         rts
 
     .endsegment
