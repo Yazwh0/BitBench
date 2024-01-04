@@ -216,8 +216,6 @@ private static void Proc()
 
         jsr bench_memory:update_bank     ; update the bank to the actual process ID
 
-        lda RAM_BANK
-        pha
         lda new_bank
         sta RAM_BANK
 
@@ -228,6 +226,7 @@ private static void Proc()
         bcs error_pl
 
         pla
+        pha
         sta bench_general:application_processid
 
         ; setup stack, (bitbench_zp:zp_pointer) is a pointer to the stack block

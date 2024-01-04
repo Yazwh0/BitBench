@@ -36,6 +36,9 @@ private static void Setup()
     .const window_text = @(WindowText)
     .const inactive_window_text = @(InactiveWindowText)
 
+    .const background_colour = $c3
+    .const background_tile = $66
+
     .const window_width_offset = 0
     .const window_height_offset = 1
     .const window_top_offset = 2
@@ -113,30 +116,52 @@ private static void Proc()
 
         stz CTRL
     
-        stz current_window
+        lda #$ff
+        sta current_window
 
         ; write to data0 128*60*2/16=960 times.
         ldx #<screensize
         ldy #(>screensize)+1
     .loop:
+        lda #background_tile
+        sta DATA0
+        lda #background_colour
+        sta DATA0
 
-        stz DATA0
-        stz DATA0
-        stz DATA0
-        stz DATA0
-        stz DATA0
-        stz DATA0
-        stz DATA0
-        stz DATA0
-        stz DATA0
-        stz DATA0
-        stz DATA0
-        stz DATA0
-        stz DATA0
-        stz DATA0
-        stz DATA0
-        stz DATA0
-        stz DATA0
+        lda #background_tile
+        sta DATA0
+        lda #background_colour
+        sta DATA0
+
+        lda #background_tile
+        sta DATA0
+        lda #background_colour
+        sta DATA0
+        
+        lda #background_tile
+        sta DATA0
+        lda #background_colour
+        sta DATA0
+
+        lda #background_tile
+        sta DATA0
+        lda #background_colour
+        sta DATA0
+
+        lda #background_tile
+        sta DATA0
+        lda #background_colour
+        sta DATA0
+
+        lda #background_tile
+        sta DATA0
+        lda #background_colour
+        sta DATA0
+        
+        lda #background_tile
+        sta DATA0
+        lda #background_colour
+        sta DATA0
 
         dex
         bne -loop
@@ -427,6 +452,22 @@ private static void Proc()
         jmp -loop
 
     .done:
+        ; now blur the previous window and draw.
+        lda #bench_general:bank_bench
+        sta RAM_BANK
+
+        jsr blur_current_window
+
+        lda #bench_general:bank_bench
+        sta RAM_BANK
+
+        ; draw new window
+        pla
+        pha
+        sta current_window
+
+        sec
+        jsr draw_window
 
         lda bench_general:return_rambank
         sta RAM_BANK
@@ -689,7 +730,37 @@ private static void Proc()
         pha ; store window ID
 
         ; old window
+        jsr blur_current_window
+
+
+        ; new focus
+        pla ; get window ID
+        
+        ; call focus
+        jsr focus_window
+
+
+        lda #bench_general:bank_bench
+        sta RAM_BANK
+
         lda current_window
+        jsr map_window_to_top
+
+    .done:
+        pla
+        sta RAM_BANK
+
+        rts
+
+    .endproc
+
+    ; blurs the current window
+    ; ** CHANGES RAM BANK **
+    .proc blur_current_window
+
+        lda current_window
+        cmp #$ff
+        beq done
 
         ; call blur
         ; first get process ID, so we can get the RAM Bank to call blur()
@@ -716,10 +787,17 @@ private static void Proc()
         clc
         jsr draw_window
 
-        ; new focus
-        pla ; get window ID
-        
-        ; call focus
+    .done:
+        rts
+
+    .endproc
+
+    ; focus's for the window in A
+    ; ** CHANGES RAM BANK **
+    ; Inputs:
+    ; A: Window ID
+    .proc focus_window
+
         sta current_window
 
         clc
@@ -742,16 +820,6 @@ private static void Proc()
 
         sec
         jsr draw_window
-
-        lda #bench_general:bank_bench
-        sta RAM_BANK
-
-        lda current_window
-        jsr map_window_to_top
-
-    .done:
-        pla
-        sta RAM_BANK
 
         rts
 

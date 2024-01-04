@@ -267,6 +267,8 @@ import Window="bench\window.bmasm";
     ApiHelper.Header("TEST", "entry", "exit", "focus", "blur", 1, 1);
 
     .entry:    
+        sei
+
         lda #$05
         sta bench_window:window_top
         sta bench_window:window_left
@@ -288,7 +290,7 @@ import Window="bench\window.bmasm";
         jsr bench_window:create_window
         ;clc
         ;jsr bench_window:draw_window
-
+        cli
     .loop:
         jsr test_proc
         inc $02
@@ -315,7 +317,7 @@ import Window="bench\window.bmasm";
 
     .byte 1, 2, 3, 4, 5
     .entry:
-
+        sei
         lda #$10
         sta bench_window:window_top
         sta bench_window:window_left
@@ -338,8 +340,7 @@ import Window="bench\window.bmasm";
         ;sec
         ;jsr bench_window:draw_window
 
-        nop
-        stz $03
+        cli
     .loop:
         jsr test_proc
         inc $03

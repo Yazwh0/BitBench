@@ -25,9 +25,9 @@ private static void Setup()
     .const application_focus $a015  
     .const application_blur $a018
 
-    .const application_frame_update $a01b
-    .const application_zp_count $a01c
-    .const application_processid $a01d
+    .constvar byte application_frame_update $a01b
+    .constvar byte application_zp_count $a01c
+    .constvar byte application_processid $a01d
 
     .const bank_kernel = $00
     .const bank_bench = $01
