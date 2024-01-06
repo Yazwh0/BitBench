@@ -86,6 +86,10 @@ private static void Setup()
 
     .endsegment
 
+    .segment bench_zp, scope=bench_window
+    .padvar byte drawing_window
+    .endsegment
+
     Global.AddMouseHandler("bench_window:mouse_move");
 }
 
@@ -911,6 +915,14 @@ private static void Proc()
     ; A : Window ID
     .proc update_display_window
 
+        .const top = bench_general:zp_pointer+1
+        .const left = bench_general:zp_pointer
+        .const width = bench_general:zp_pointer2
+        .const height = bench_general:zp_pointer2+1
+    
+        sta drawing_window
+        tax
+
         lda #$09
         sta DC_BORDER
 
@@ -920,7 +932,7 @@ private static void Proc()
         lda #bench_general:bank_bench
         sta RAM_BANK
         
-        cmp current_window
+        cpx current_window
         bne redraw_part
         sec                 ; top window
         jsr draw_window     ; if we're drawing the current window, we know its got focus
@@ -933,6 +945,139 @@ private static void Proc()
         rts
 
     .redraw_part:
+
+        ; itterate through the map looking for visible pixels, otherwise dont write
+        ; dont update the border
+
+        txa
+
+        clc
+        rol ;* 16
+        rol
+        rol
+        rol
+
+        tax
+
+        ; get window dimensions without the border
+        lda window_data + window_top_offset, x   
+        inc
+        sta top
+        lda window_data + window_left_offset, x
+        inc
+        sta left
+        lda window_data + window_width_offset, x
+        dec
+        dec
+        sta width
+        lda window_data + window_height_offset, x
+        dec
+        dec
+        sta height
+
+        ; get the window vram offset and add 1+width to get to the first tile of the display
+        lda #01
+        sta CTRL
+
+        clc
+        lda window_data + window_vram_addr_offset, x
+        sta ADDRx_L
+        lda window_data + window_vram_addr_offset + 1, x
+        sta ADDRx_M
+        lda window_data + window_vram_addr_offset + 2, x
+        sta ADDRx_H
+        stz CTRL
+
+        lda #bench_general:bank_windowmap
+        sta RAM_BANK
+
+        ; setup VRAM banks
+        ; copy from DATA1 -> DATA0
+        ; DATA1 is the window data set above
+        ; DATA0 is the display
+
+        ; Set data0 to the first pixel
+
+        ; starting position
+        stz CTRL
+        lda left
+        clc
+        rol
+        sta ADDRx_L
+
+        lda #$10
+        sta ADDRx_H
+
+        lda top
+        sta ADDRx_M
+
+        ; use top\left parameters as a pointer, need to div/2 to get to single byte steps
+        clc
+        rol left
+        clc
+        ror
+        ror left
+
+        clc
+        adc #$a0
+        sta top
+        ; left, top should now point to the location in the window map
+
+        ;pla             ; get window id
+        ;pha 
+
+        ldx height
+        ldy #0
+    .loop:
+        lda drawing_window
+        cmp (bench_general:zp_pointer), y       ; compare window ID in the map to ours
+        bne not_this_window
+
+    .this_window:
+        ; copy the tile over
+        lda DATA1
+        sta DATA0
+        lda DATA1
+        sta DATA0
+
+        jmp +done
+    .not_this_window:
+        lda DATA1
+        lda DATA0
+        lda DATA1
+        lda DATA0
+
+    .done:
+        iny
+        cpy width
+        bne -loop
+
+        dex
+        beq +done
+
+        clc
+        lda left
+        adc #$80
+        sta left
+        lda top
+        adc #0
+        sta top
+
+        ldy #0
+
+        ; adjust DATA0 address by one line
+        lda left
+        clc
+        rol
+        sta ADDRx_L
+
+        lda ADDRx_M
+        inc
+        sta ADDRx_M
+
+        jmp -loop
+
+    .done:    
 
         pla
         sta RAM_BANK

@@ -81,7 +81,7 @@ private static void Proc()
         bne -loop
 
         ; copy new process ZP Data
-        ldy #$5d 
+        ldy #$5d ; todo, source this from the process settings
         lda #$22
         sta bench_general:zp_pointer2
         lda #0
