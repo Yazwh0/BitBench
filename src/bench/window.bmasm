@@ -18,7 +18,7 @@ private static void Setup()
 
     .segment bench_window, scope=bench_window
 
-    ; todo, change the order of these to match the other ordering
+    ; todo, change the order of these to match the other ordering    
     .constvar byte window_width = $02
     .constvar byte window_height = $03
     .constvar byte window_left = $04
@@ -27,6 +27,13 @@ private static void Setup()
     
     .constvar byte window_bordercolour = $02
     .constvar byte window_textcolour = $03
+
+    ; for updating the display
+    .constvar byte content_window_id = $02
+    .constvar byte content_left = $03
+    .constvar byte content_top = $04
+    .constvar ushort content_source_address = $05
+    .constvar ushort content_source_length = $07
 
     .const SCREEN_MODE = $ff5f
     .const MOUSE_CONFIG = $ff68
@@ -340,19 +347,7 @@ private static void Proc()
     .done:
         ; allocate VRAM
         ; multiply height-2 * width-2 * 2
-        lda #0
-        ldx #8
-        lsr bench_general:factor1
-    .loop:
-        bcc no_add
-        clc
-        adc bench_general:factor2
-    .no_add:
-        ror
-        ror bench_general:factor1
-        dex
-        bne -loop
-        sta bench_general:factor2
+        jsr bench_general:multiply
 
         plx
 
@@ -820,6 +815,91 @@ private static void Proc()
 
         sec
         jsr draw_window
+
+        rts
+
+    .endproc
+
+    ; ** Can be called by applications **
+    ; Updates the contents in VRAM for a window
+    ; uses contents_* locations in ZP
+    .proc update_window_contents
+
+        lda RAM_BANK
+        pha
+
+        lda #bench_general:bank_bench
+        sta RAM_BANK
+
+        stz CTRL    
+
+        lda content_window_id
+        clc
+        rol ; * 16
+        rol
+        rol
+        rol
+        tax     
+
+        lda window_data + window_width_offset, x
+        phx
+
+        dec                             ; adjust for border
+        dec
+        sta bench_general:factor1
+        lda content_top
+        sta bench_general:factor2
+
+        jsr bench_general:multiply      ; top * width
+
+        clc
+
+        lda bench_general:factor1       ; + left
+        adc content_left
+        sta bench_general:factor1
+        lda bench_general:factor2
+        adc #0
+        sta bench_general:factor2
+
+        clc                             ; * 2
+        rol bench_general:factor1
+        rol bench_general:factor2
+
+        clc
+
+        plx
+        ; set DATA0 to offset of start position within the VRAM array for this window
+        lda window_data + window_vram_addr_offset, x
+        adc bench_general:factor1
+        sta ADDRx_L
+        lda window_data + window_vram_addr_offset + 1, x
+        adc bench_general:factor2
+        sta ADDRx_M
+        lda window_data + window_vram_addr_offset + 2, x
+        adc #0
+        sta ADDRx_H
+
+        ldx content_source_length
+        ldy content_source_length + 1
+        iny
+
+        pla
+        sta RAM_BANK
+
+    .loop:
+        lda (content_source_address)
+        sta DATA0
+
+        inc content_source_address
+        bne no_overflow
+        inc content_source_address + 1
+
+    .no_overflow:
+
+        dex
+        bne -loop
+        dey
+        bne -loop
 
         rts
 

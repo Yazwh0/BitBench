@@ -46,7 +46,7 @@ private static void Proc()
         bne not_already_active
         rts
 
-    .not_already_active:
+    .not_already_active:    
         sta next_process    ; store current process for later
 
         ; adjust stack so it can be rti'd
@@ -56,7 +56,7 @@ private static void Proc()
         pla
         sta return_address + 1
 
-        StoreCurrentProcess();
+        StoreCurrentProcess();  // This checks that the current process isn't 0xff
 
         ; copy new process stack
         lda #1
@@ -114,7 +114,7 @@ private static void Proc()
 
         StoreCurrentProcess();
 
-        lda #1
+        lda #bench_general:bank_bench
         sta RAM_BANK
 
         lda return_address + 1

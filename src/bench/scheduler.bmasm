@@ -185,6 +185,8 @@ private static void Proc()
         and #$0f
         ldy process_count
 
+        beq +no_process
+
         clc
         rol
         rol

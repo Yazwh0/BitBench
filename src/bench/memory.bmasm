@@ -69,11 +69,17 @@ private static void Proc()
         ; reserve space for the loader while it is not in ROM.
         lda #$ff
         ldx #$08
+        ; 0x800 -> 0x900
         sta blocks, x
         inx
         sta blocks, x
         inx
         sta blocks, x
+        inx
+        sta blocks, x
+        inx
+        ; 0x900 -> 0xa00
+        sta blocks, x        
         inx
         sta blocks, x
         inx

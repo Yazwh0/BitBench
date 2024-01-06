@@ -49,6 +49,35 @@ private static void Setup()
     .endsegment
 }
 
+private static void Proc()
+{
+    .scope bench_general
+
+    ; multiplys to 8bit numbers in factor1/2, 
+    ; returning the values factor1 and factor2
+    .proc multiply
+
+        lda #0
+        ldx #8
+        lsr bench_general:factor1
+    .loop:
+        bcc no_add
+        clc
+        adc bench_general:factor2
+    .no_add:
+        ror
+        ror bench_general:factor1
+        dex
+        bne -loop
+        sta bench_general:factor2
+
+        rts
+
+    .endproc
+
+    .endscope
+}
+
 public static void Call_HandleMouse()
 {
     foreach(var callback in _mouse)
@@ -64,6 +93,7 @@ public static void AddMouseHandler(string name)
 
 public override void Initialise()
 {
+    Init.Add(Proc);
     Setup();
 }
  

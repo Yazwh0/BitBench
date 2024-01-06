@@ -324,6 +324,78 @@ private static void Proc()
 
     .endproc
 
+    ; called by the current process to hand back control    
+    .proc process_sleep
+        sei     ; we dont want to interrupt this process
+        ; add CPU flags, and AYX so it looks like a interrupt
+        sta bench_general:zp_pointer
+        
+        lda #0      ; We dont guanaratee flags coming out of process_sleep
+        pha         ; CPU Flags
+
+        lda bench_general:zp_pointer
+        pha         ; A
+        phx         ; X
+        phy         ; Y
+
+        ; always store these for the switcher
+        lda RAM_BANK
+        pha
+        lda ROM_BANK
+        pha
+
+        lda #bench_general:bank_bench  ; Bench uses bank 1.
+        sta RAM_BANK 
+
+        jsr bench_scheduler:get_next_process ; returns 0 if nothing to do
+
+        beq nothing_to_do        
+
+        jsr bench_switcher:activate_process_interrupt 
+
+        ; stack here will always have these values even if switched
+        pla 
+        sta ROM_BANK
+        pla
+        sta RAM_BANK
+
+        stz DC_BORDER
+
+        plx
+        ply
+        pla
+
+        rti
+
+    .nothing_to_do:    
+        jsr bench_switcher:store_process
+
+        lda #$ff
+        sta bench_switcher:current_process
+
+        ; ldx #$fe
+        ; txs
+
+        lda #>idle_loop
+        pha
+        lda #<idle_loop
+        pha
+        lda #0
+        pha     ; cpu flags
+
+        stz DC_BORDER
+
+        rti        
+    .endproc
+
+    .proc idle_loop
+
+    .loop:
+        cli
+        wai
+        jmp loop
+
+    .endproc
 
     .endscope
 }

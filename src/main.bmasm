@@ -226,6 +226,10 @@ import Window="bench\window.bmasm";
 
     .nothing_to_do:
         jsr bench_switcher:store_process
+
+        lda #$ff
+        sta bench_switcher:current_process
+
         ; set the return value to the idle loop sprocs
         ; empty the stack, and push a dummy entry
         ldx #$fe
@@ -288,27 +292,71 @@ import Window="bench\window.bmasm";
 
         lda bench_general:application_processid
         jsr bench_window:create_window
+        sta window_id
         ;clc
         ;jsr bench_window:draw_window
         cli
     .loop:
-        jsr test_proc
-        inc $02
+        jsr bench_process:process_sleep       
         jmp -loop
-
-    .proc test_proc
-        wai
-        rts
-    .endproc
 
     .exit:
         rts
 
     .focus:
+        ; these events happen within the interrupt handler
+        lda window_id
+        sta bench_window:content_window_id
+        lda #1
+        sta bench_window:content_top
+        lda #1
+        sta bench_window:content_left
+        lda #10
+        sta bench_window:content_source_length
+        stz bench_window:content_source_length + 1
+        lda #<focus_source_data
+        sta bench_window:content_source_address
+        lda #>focus_source_data
+        sta bench_window:content_source_address + 1
+
+        jsr bench_window:update_window_contents
+
         rts
 
     .blur:
+        ; these events happen within the interrupt handler
+        lda window_id
+        sta bench_window:content_window_id
+        lda #1
+        sta bench_window:content_top
+        lda #1
+        sta bench_window:content_left
+        lda #10
+        sta bench_window:content_source_length
+        stz bench_window:content_source_length + 1
+        lda #<blur_source_data
+        sta bench_window:content_source_address
+        lda #>blur_source_data
+        sta bench_window:content_source_address + 1
+
+        jsr bench_window:update_window_contents
+
         rts
+
+    .data:
+        .padvar byte window_id
+    .blur_source_data:
+        .byte 0x02, 0x02
+        .byte 0x0c, 0x02
+        .byte 0x15, 0x02
+        .byte 0x12, 0x02
+        .byte 0x20, 0x02
+    .focus_source_data:
+        .byte 0x06, 0x05
+        .byte 0x0f, 0x05
+        .byte 0x03, 0x05
+        .byte 0x15, 0x05
+        .byte 0x13, 0x05
 
     .endsegment
 
@@ -337,29 +385,72 @@ import Window="bench\window.bmasm";
 
         lda bench_general:application_processid
         jsr bench_window:create_window
+        sta window_id
         ;sec
         ;jsr bench_window:draw_window
 
         cli
     .loop:
-        jsr test_proc
-        inc $03
-        jmp loop
-
-    .proc test_proc
-        wai
-        rts
-    .endproc
+        jsr bench_process:process_sleep
+        jmp -loop
 
     .exit:
         rts
 
     .focus:
+        ; these events happen within the interrupt handler
+        lda window_id
+        sta bench_window:content_window_id
+        lda #5
+        sta bench_window:content_top
+        lda #5
+        sta bench_window:content_left
+        lda #10
+        sta bench_window:content_source_length
+        stz bench_window:content_source_length + 1
+        lda #<focus_source_data
+        sta bench_window:content_source_address
+        lda #>focus_source_data
+        sta bench_window:content_source_address + 1
+
+        jsr bench_window:update_window_contents
+
         rts
 
     .blur:
+        ; these events happen within the interrupt handler
+        lda window_id
+        sta bench_window:content_window_id
+        lda #5
+        sta bench_window:content_top
+        lda #5
+        sta bench_window:content_left
+        lda #10
+        sta bench_window:content_source_length
+        stz bench_window:content_source_length + 1
+        lda #<blur_source_data
+        sta bench_window:content_source_address
+        lda #>blur_source_data
+        sta bench_window:content_source_address + 1
+
+        jsr bench_window:update_window_contents
+
         rts
 
+    .data:
+        .padvar byte window_id
+    .blur_source_data:
+        .byte 0x02, 0x02
+        .byte 0x0c, 0x02
+        .byte 0x15, 0x02
+        .byte 0x12, 0x02
+        .byte 0x20, 0x02
+    .focus_source_data:
+        .byte 0x06, 0x05
+        .byte 0x0f, 0x05
+        .byte 0x03, 0x05
+        .byte 0x15, 0x05
+        .byte 0x13, 0x05
     .endsegment
 
     ; create procs
