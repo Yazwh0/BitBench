@@ -905,6 +905,44 @@ private static void Proc()
 
     .endproc
 
+    ; ** Can be called by applications **
+    ; Draw window after changes
+    ; Input :
+    ; A : Window ID
+    .proc update_display_window
+
+        lda #$09
+        sta DC_BORDER
+
+        lda RAM_BANK
+        pha
+
+        lda #bench_general:bank_bench
+        sta RAM_BANK
+        
+        cmp current_window
+        bne redraw_part
+        sec                 ; top window
+        jsr draw_window     ; if we're drawing the current window, we know its got focus
+
+        pla
+        sta RAM_BANK
+
+        stz DC_BORDER
+
+        rts
+
+    .redraw_part:
+
+        pla
+        sta RAM_BANK
+
+        stz DC_BORDER
+
+        rts
+
+    .endproc
+
     .endscope
 }
 

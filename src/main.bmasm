@@ -386,12 +386,39 @@ import Window="bench\window.bmasm";
         lda bench_general:application_processid
         jsr bench_window:create_window
         sta window_id
-        ;sec
-        ;jsr bench_window:draw_window
+
+        stz counter
+        lda #1
+        sta colour
 
         cli
     .loop:
         jsr bench_process:process_sleep
+
+        inc counter
+
+        sei
+        lda window_id
+        sta bench_window:content_window_id
+        lda #5
+        sta bench_window:content_top
+        lda #1
+        sta bench_window:content_left
+        lda #2 ; number of bytes
+        sta bench_window:content_source_length
+        stz bench_window:content_source_length + 1
+        lda #<counter
+        sta bench_window:content_source_address
+        lda #>counter
+        sta bench_window:content_source_address + 1
+
+        jsr bench_window:update_window_contents
+
+        lda window_id
+        jsr bench_window:update_display_window
+
+        cli
+
         jmp -loop
 
     .exit:
@@ -439,6 +466,8 @@ import Window="bench\window.bmasm";
 
     .data:
         .padvar byte window_id
+        .padvar byte counter
+        .padvar byte colour
     .blur_source_data:
         .byte 0x02, 0x02
         .byte 0x0c, 0x02
