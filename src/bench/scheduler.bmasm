@@ -192,7 +192,6 @@ private static void Proc()
         rol
         tax
         .loop:
-        dey                                      
 
         lda scheduler_data + Required, x         ; realtime?
         beq +end_loop
@@ -212,6 +211,7 @@ private static void Proc()
 
         cpy #0
         beq no_process
+        dey                                      
 
         jmp -loop
 

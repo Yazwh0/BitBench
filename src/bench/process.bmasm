@@ -335,8 +335,8 @@ private static void Proc()
 
         lda bench_general:zp_pointer
         pha         ; A
-        phx         ; X
         phy         ; Y
+        phx         ; X
 
         ; always store these for the switcher
         lda RAM_BANK

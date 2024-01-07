@@ -421,7 +421,7 @@ import Window="bench\window.bmasm";
     ; x bounds
         lda curr_x
         beq +reverse
-        cmp #@(width)
+        cmp #@(width-1)
         bne +no_change
 
     .reverse:
@@ -435,7 +435,7 @@ import Window="bench\window.bmasm";
     ; y bounds
         lda curr_y
         beq +reverse
-        cmp #@(height)
+        cmp #@(height-1)
         bne +no_change
 
     .reverse:
