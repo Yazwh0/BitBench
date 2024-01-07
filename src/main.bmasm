@@ -339,7 +339,7 @@ import Window="bench\window.bmasm";
         lda #4
         sta DC_BORDER
 
-        ; clear current
+        ;clear current
         lda #$20
         sta (address)
 
@@ -348,35 +348,14 @@ import Window="bench\window.bmasm";
         lda curr_x
         adc xpos_chg
         sta curr_x
-        beq +reverse
-        cmp #@(width)
-        bne +no_change
-
-    .reverse:
-        lda xpos_chg
-        eor #$ff
-        inc
-        sta xpos_chg
-
-    .no_change:
 
     ; y 
         clc
         lda curr_y
         adc ypos_chg
         sta curr_y
-        beq +reverse
-        cmp #@(height)
-        bne +no_change
 
-    .reverse:
-        lda ypos_chg
-        eor #$ff
-        inc
-        sta ypos_chg
-
-    .no_change:
-    
+    ; apply changes
     ; x change
         lda xpos_chg
         cmp #1
@@ -431,11 +410,42 @@ import Window="bench\window.bmasm";
 
     .done:
 
+    ; plot
         ldy #1
         lda #$51
         sta (address)
         lda #$26
         sta (address), y
+
+
+    ; x bounds
+        lda curr_x
+        beq +reverse
+        cmp #@(width)
+        bne +no_change
+
+    .reverse:
+        lda xpos_chg
+        eor #$ff
+        inc
+        sta xpos_chg
+
+    .no_change:
+
+    ; y bounds
+        lda curr_y
+        beq +reverse
+        cmp #@(height)
+        bne +no_change
+
+    .reverse:
+        lda ypos_chg
+        eor #$ff
+        inc
+        sta ypos_chg
+
+    .no_change:
+    
 
         sei
 

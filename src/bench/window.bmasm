@@ -934,6 +934,7 @@ private static void Proc()
         
         cpx current_window
         bne redraw_part
+        lda drawing_window
         sec                 ; top window
         jsr draw_window     ; if we're drawing the current window, we know its got focus
 
