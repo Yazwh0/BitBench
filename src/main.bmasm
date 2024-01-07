@@ -268,7 +268,12 @@ import Window="bench\window.bmasm";
     .endsegment
 
     .segment testapp $a000 $2000 TESTAPP.BIN testapp
-    ApiHelper.Header("TEST", "entry", "exit", "focus", "blur", 1, 1);
+    ApiHelper.Header("TEST", "entry", "exit", "focus", "blur", 2, 1);
+
+    const int width = 0x30-2;
+    const int height = 0x10-2; 
+
+    .constvar ushort address = $22
 
     .entry:    
         sei
@@ -276,9 +281,9 @@ import Window="bench\window.bmasm";
         lda #$05
         sta bench_window:window_top
         sta bench_window:window_left
-        lda #$30
+        lda #@(width+2)
         sta bench_window:window_width
-        lda #$10
+        lda #@(height+2)
         sta bench_window:window_height
         lda #<title
         sta bench_window:window_title
@@ -296,8 +301,169 @@ import Window="bench\window.bmasm";
         ;clc
         ;jsr bench_window:draw_window
         cli
+
+        lda #<display
+        sta address
+        lda #>display
+        sta address + 1
+
+        ldx #>@(width * height * 2)
+        ldy #<@(width * height * 2)
+
+        lda #0
+    .loop:    
+        sta (address)
+        inc address
+        bne no_overflow
+        inc address + 1
+
+    .no_overflow:
+
+        dex
+        bne -loop
+        dey
+        bne -loop
+
+        lda #<display
+        sta address
+        lda #>display
+        sta address + 1
+
+        stz curr_x
+        stz curr_y
+        lda #1
+        sta xpos_chg
+        sta ypos_chg
+
     .loop:
-        jsr bench_process:process_sleep       
+        lda #4
+        sta DC_BORDER
+
+        ; clear current
+        lda #$20
+        sta (address)
+
+    ; x
+        clc
+        lda curr_x
+        adc xpos_chg
+        sta curr_x
+        beq +reverse
+        cmp #@(width)
+        bne +no_change
+
+    .reverse:
+        lda xpos_chg
+        eor #$ff
+        inc
+        sta xpos_chg
+
+    .no_change:
+
+    ; y 
+        clc
+        lda curr_y
+        adc ypos_chg
+        sta curr_y
+        beq +reverse
+        cmp #@(height)
+        bne +no_change
+
+    .reverse:
+        lda ypos_chg
+        eor #$ff
+        inc
+        sta ypos_chg
+
+    .no_change:
+    
+    ; x change
+        lda xpos_chg
+        cmp #1
+        bne +subtract
+    
+        clc
+        lda address
+        adc #2
+        sta address
+        lda address + 1
+        adc # 0
+        sta address + 1
+        jmp +done
+
+    .subtract:
+
+        sec
+        lda address
+        sbc #2
+        sta address
+        lda address + 1
+        sbc # 0
+        sta address + 1
+        jmp +done
+
+    .done:
+
+    ; y change
+        lda ypos_chg
+        cmp #1
+        bne +subtract
+    
+        clc
+        lda address
+        adc #@(width * 2)
+        sta address
+        lda address + 1
+        adc # 0
+        sta address + 1
+        jmp +done
+
+    .subtract:
+
+        sec
+        lda address
+        sbc #@(width * 2)
+        sta address
+        lda address + 1
+        sbc # 0
+        sta address + 1
+        jmp +done
+
+    .done:
+
+        ldy #1
+        lda #$51
+        sta (address)
+        lda #$26
+        sta (address), y
+
+        sei
+
+        lda window_id
+        sta bench_window:content_window_id
+        
+        stz bench_window:content_top
+        stz bench_window:content_left
+        lda #<@(width * height * 2)
+        sta bench_window:content_source_length
+        lda #>@(width * height * 2)
+        sta bench_window:content_source_length + 1
+        lda #<display
+        sta bench_window:content_source_address
+        lda #>display
+        sta bench_window:content_source_address + 1
+
+        jsr bench_window:update_window_contents
+
+        lda window_id
+        jsr bench_window:update_display_window
+
+        cli
+
+        lda #2
+        sta DC_BORDER
+
+        jsr bench_process:process_sleep
         jmp -loop
 
     .exit:
@@ -305,47 +471,51 @@ import Window="bench\window.bmasm";
 
     .focus:
         ; these events happen within the interrupt handler
-        lda window_id
-        sta bench_window:content_window_id
-        lda #1
-        sta bench_window:content_top
-        lda #1
-        sta bench_window:content_left
-        lda #10
-        sta bench_window:content_source_length
-        stz bench_window:content_source_length + 1
-        lda #<focus_source_data
-        sta bench_window:content_source_address
-        lda #>focus_source_data
-        sta bench_window:content_source_address + 1
+        ; lda window_id
+        ; sta bench_window:content_window_id
+        ; lda #1
+        ; sta bench_window:content_top
+        ; lda #1
+        ; sta bench_window:content_left
+        ; lda #10
+        ; sta bench_window:content_source_length
+        ; stz bench_window:content_source_length + 1
+        ; lda #<focus_source_data
+        ; sta bench_window:content_source_address
+        ; lda #>focus_source_data
+        ; sta bench_window:content_source_address + 1
 
-        lda window_id
-        jsr bench_window:update_window_contents
+        ; lda window_id
+        ; jsr bench_window:update_window_contents
 
         rts
 
     .blur:
         ; these events happen within the interrupt handler
-        lda window_id
-        sta bench_window:content_window_id
-        lda #1
-        sta bench_window:content_top
-        lda #1
-        sta bench_window:content_left
-        lda #10
-        sta bench_window:content_source_length
-        stz bench_window:content_source_length + 1
-        lda #<blur_source_data
-        sta bench_window:content_source_address
-        lda #>blur_source_data
-        sta bench_window:content_source_address + 1
+        ; lda window_id
+        ; sta bench_window:content_window_id
+        ; lda #1
+        ; sta bench_window:content_top
+        ; lda #1
+        ; sta bench_window:content_left
+        ; lda #10
+        ; sta bench_window:content_source_length
+        ; stz bench_window:content_source_length + 1
+        ; lda #<blur_source_data
+        ; sta bench_window:content_source_address
+        ; lda #>blur_source_data
+        ; sta bench_window:content_source_address + 1
 
-        jsr bench_window:update_window_contents
+        ; jsr bench_window:update_window_contents
 
         rts
 
     .data:
+        .padvar byte curr_x
+        .padvar byte curr_y
         .padvar byte window_id
+        .padvar byte xpos_chg
+        .padvar byte ypos_chg
     .blur_source_data:
         .byte 0x02, 0x02
         .byte 0x0c, 0x02
@@ -358,11 +528,16 @@ import Window="bench\window.bmasm";
         .byte 0x03, 0x05
         .byte 0x15, 0x05
         .byte 0x13, 0x05
+    .align $100
+        .padvar byte[@(width * height * 2)] display
 
     .endsegment
 
     .segment testapp2 $a000 $2000 TESTAPP2.BIN testapp2
-    ApiHelper.Header("TEST2", "entry", "exit", "focus", "blur", 10, 1);
+    ApiHelper.Header("TEST2", "entry", "exit", "focus", "blur", 5, 1);
+
+    const int width2 = 0x3c;
+    const int height2 = 0x20; 
 
     .byte 1, 2, 3, 4, 5
     .entry:
@@ -370,9 +545,9 @@ import Window="bench\window.bmasm";
         lda #$10
         sta bench_window:window_top
         sta bench_window:window_left
-        lda #$3c
+        lda #@(width2)
         sta bench_window:window_width
-        lda #$20
+        lda #@(height2)
         sta bench_window:window_height
         lda #<title2
         sta bench_window:window_title
@@ -394,7 +569,15 @@ import Window="bench\window.bmasm";
 
         cli
     .loop:
+
+
+        lda #2
+        sta DC_BORDER
+
         jsr bench_process:process_sleep
+
+        lda #7
+        sta DC_BORDER
 
         inc counter
 
@@ -426,7 +609,7 @@ import Window="bench\window.bmasm";
         rts
 
     .focus:
-        ; these events happen within the interrupt handler
+        ;these events happen within the interrupt handler
         lda window_id
         sta bench_window:content_window_id
         lda #5
@@ -446,7 +629,7 @@ import Window="bench\window.bmasm";
         rts
 
     .blur:
-        ; these events happen within the interrupt handler
+        ;these events happen within the interrupt handler
         lda window_id
         sta bench_window:content_window_id
         lda #5
@@ -481,6 +664,7 @@ import Window="bench\window.bmasm";
         .byte 0x03, 0x05
         .byte 0x15, 0x05
         .byte 0x13, 0x05
+
     .endsegment
 
     ; create procs
