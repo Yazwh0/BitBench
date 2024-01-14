@@ -45,6 +45,8 @@ private static void Setup()
     .padvar byte prev_mouse_y
     .padvar byte prev_mouse_buttons
     .padvar byte keyboard
+    .padvar ushort zp_scratch
+    .padvar ushort zp_scratch2
 
     .endsegment
 }

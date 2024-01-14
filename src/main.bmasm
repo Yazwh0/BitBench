@@ -268,7 +268,7 @@ import Window="bench\window.bmasm";
     .endsegment
 
     .segment testapp $a000 $2000 TESTAPP.BIN testapp
-    ApiHelper.Header("TEST", "entry", "exit", "focus", "blur", 2, 1);
+    ApiHelper.Header("TEST", "entry", "exit", "focus", "blur", 1, 1);
 
     const int width = 0x30-2;
     const int height = 0x10-2; 
@@ -446,9 +446,9 @@ import Window="bench\window.bmasm";
 
     .no_change:
     
-
         sei
 
+        ; Update the whole window buffer
         lda window_id
         sta bench_window:content_window_id
         
@@ -465,6 +465,7 @@ import Window="bench\window.bmasm";
 
         jsr bench_window:update_window_contents
 
+        ; Update the display
         lda window_id
         jsr bench_window:update_display_window
 
@@ -544,7 +545,7 @@ import Window="bench\window.bmasm";
     .endsegment
 
     .segment testapp2 $a000 $2000 TESTAPP2.BIN testapp2
-    ApiHelper.Header("TEST2", "entry", "exit", "focus", "blur", 5, 1);
+    ApiHelper.Header("TEST2", "entry", "exit", "focus", "blur", 1, 1);
 
     const int width2 = 0x3c;
     const int height2 = 0x20; 

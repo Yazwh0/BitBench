@@ -1,5 +1,6 @@
 library BitBench.Window.Manager;
 
+import Dragging="window_dragging.bmasm";
 import Init="initialisation.bmasm";
 import Global="globals.bmasm";
 
@@ -83,6 +84,7 @@ private static void Setup()
     .padvar byte vram_addr_m
     .padvar byte vram_addr_h
     .padvar byte current_window
+
 
     .endsegment
 
@@ -234,6 +236,8 @@ private static void Proc()
 
         pla
         sta RAM_BANK
+
+        jsr drag_initialise
 
         rts
 
@@ -689,14 +693,36 @@ private static void Proc()
         and #01 ; left mouse button
         bne mouse_is_down
 
+        lda dragging
+        bne stop_dragging
+
     .done:
+        rts
+
+    .stop_dragging:
+        jsr end_dragging
+        rts
+
+    .dragging:
+
+        lda dragging
+        beq -done
+        bpl already_dragging
+        
+        lda #1
+        sta dragging
+
+    .already_dragging:
+
+        ; move sprites to mouse location
+        jsr update_dragging
         rts
 
     .mouse_is_down:
 
         eor bench_general:prev_mouse_buttons
         and #01
-        beq -done
+        beq -dragging
 
         ; get window id
         lda RAM_BANK
@@ -718,19 +744,18 @@ private static void Proc()
         sta bench_general:zp_pointer+1
 
         lda (bench_general:zp_pointer)
-        bmi +done
+        bmi +done       ; nothing clicked on
 
         ldx #bench_general:bank_bench
         stx RAM_BANK
 
         cmp current_window
-        beq +done
+        beq +send_click
         
         pha ; store window ID
 
         ; old window
         jsr blur_current_window
-
 
         ; new focus
         pla ; get window ID
@@ -738,17 +763,59 @@ private static void Proc()
         ; call focus
         jsr focus_window
 
-
         lda #bench_general:bank_bench
         sta RAM_BANK
 
         lda current_window
         jsr map_window_to_top
 
+        pla
+        sta RAM_BANK
+
+        rts
+
+    .send_click:
+        jsr click_current_window ; will start dragging is necessary
+
     .done:
         pla
         sta RAM_BANK
 
+        rts
+
+    .endproc
+
+    ; sends click message to current window
+    ; ** CHANGES RAM BANK **
+    ; 
+    .proc click_current_window
+
+        lda current_window
+        cmp #$ff
+        beq done
+
+        ; firs check if its the top row thats been clicked, if so
+        clc
+        rol ; * 16
+        rol
+        rol
+        rol
+        tax
+
+        lda window_data + window_top_offset, x
+        cmp bench_general:mouse_y
+        bne not_top
+
+        phx
+        jsr start_dragging
+        plx
+
+        rts
+
+    .not_top:
+
+    .done:
+        stz dragging
         rts
 
     .endproc
@@ -1042,6 +1109,7 @@ private static void Proc()
         sta DATA0
 
         jmp +done
+        
     .not_this_window:
         lda DATA1
         lda DATA0
@@ -1187,6 +1255,8 @@ public static void OutputCharacterA( string colour)
 public override void Initialise()
 {
     Init.Add(Proc);
+    Init.Add(Dragging.Proc);
     Setup();
+    Dragging.Setup();
 }
 

@@ -1,0 +1,370 @@
+library BitBench.WindowDragging.Manager;
+
+import Init="initialisation.bmasm";
+import Global="globals.bmasm";
+
+public static void Setup()
+{
+    .segment bench_window, scope=bench_window
+    
+    .padvar byte dragging               ; 0: not dragging, -1: click on top row, 1: dragging
+    .padvar byte frame_left
+    .padvar byte frame_right
+    .padvar byte frame_height
+    
+    .endsegment
+}
+
+public static void Proc()
+{
+    .scope bench_window
+
+    ; store values for dragging
+    ; expects bank 1
+    ; x to equal offset
+    .proc start_dragging
+
+        ; mark us as potentially dragging
+        lda #$ff
+        sta dragging
+
+        ; capture difference in mouse to border coords
+        sec        
+        lda bench_general:mouse_x
+        sbc window_data + window_left_offset, x
+        sta frame_left
+
+        lda window_data + window_width_offset, x
+        clc
+        adc window_data + window_left_offset, x
+        sec
+        sbc bench_general:mouse_x
+        dec
+        sta frame_right
+
+        lda window_data + window_height_offset, x
+        dec
+        sta frame_height
+
+        rts
+
+    .endproc
+
+    .proc update_dragging
+
+        stz CTRL
+
+        ; setup sprites ready to be used when dragging
+        lda #($08+2)
+        sta ADDRx_L
+        lda #$fc
+        sta ADDRx_M
+        lda #$11
+        sta ADDRx_H
+
+        stz bench_general:zp_pointer
+        stz bench_general:zp_pointer + 1
+        stz bench_general:zp_pointer2
+        stz bench_general:zp_pointer2 + 1
+
+        ; mouse positions are stored as tile coords, need to *8 to get to screen coord
+        ; put x screen coords in zp_pointer
+        ; TOP LEFT
+        sec
+        lda bench_general:mouse_x
+        sbc frame_left
+        clc
+        rol
+        rol bench_general:zp_pointer + 1
+        rol
+        rol bench_general:zp_pointer + 1
+        rol
+        rol bench_general:zp_pointer + 1
+
+        sta DATA0               ; x
+        sta bench_general:zp_pointer
+        lda bench_general:zp_pointer + 1
+        sta DATA0
+
+        ; put y screen coorrds in zp_pointer2
+        clc
+        lda bench_general:mouse_y
+        rol
+        rol bench_general:zp_pointer2 + 1
+        rol
+        rol bench_general:zp_pointer2 + 1
+        rol
+        rol bench_general:zp_pointer2 + 1
+        sta DATA0               ; y
+        sta bench_general:zp_pointer2
+        lda bench_general:zp_pointer2 + 1
+        sta DATA0
+
+        lda #$0c
+        sta DATA0               ; depth
+
+        lda DATA0               
+        ; TOP RIGHT
+        lda DATA0
+        lda DATA0               ; address
+
+        ; put x coords in zp_scratch
+        clc
+        lda bench_general:mouse_x
+        adc frame_right
+        clc
+        rol
+        rol bench_general:zp_scratch + 1
+        rol
+        rol bench_general:zp_scratch + 1
+        rol
+        rol bench_general:zp_scratch + 1
+
+        sta DATA0               ; x
+        sta bench_general:zp_scratch
+        lda bench_general:zp_scratch + 1
+        sta DATA0
+
+        lda bench_general:zp_pointer2
+        sta DATA0               ; y
+        lda bench_general:zp_pointer2 + 1
+        sta DATA0
+
+        lda #$0c
+        sta DATA0               ; depth
+
+        lda DATA0
+        ; BOTTOM LEFT
+        lda DATA0
+        lda DATA0               ; address
+        lda bench_general:zp_pointer
+        sta DATA0
+        lda bench_general:zp_pointer + 1
+        sta DATA0
+
+        ; put bottom y in scratch2
+        clc
+        lda bench_general:mouse_y
+        adc frame_height
+        clc
+        rol
+        rol bench_general:zp_scratch2 + 1
+        rol
+        rol bench_general:zp_scratch2 + 1
+        rol
+        rol bench_general:zp_scratch2 + 1        
+
+        sta DATA0
+        sta bench_general:zp_scratch2
+        lda bench_general:zp_scratch2 + 1
+        sta DATA0
+
+        lda #$0c
+        sta DATA0               ; depth
+
+        lda DATA0
+        ; BOTTOM RIGHT
+        lda DATA0
+        lda DATA0               ; address
+        lda bench_general:zp_scratch
+        sta DATA0
+        lda bench_general:zp_scratch + 1
+        sta DATA0
+
+        lda bench_general:zp_scratch2
+        sta DATA0
+        lda bench_general:zp_scratch2 + 1
+        sta DATA0
+
+        lda #$0c
+        sta DATA0               ; depth
+
+        rts
+
+    .endproc
+
+    .proc end_dragging
+
+        stz dragging
+        stz CTRL
+
+        ; setup sprites ready to be used when dragging
+        lda #($08+6)
+        sta ADDRx_L
+        lda #$fc
+        sta ADDRx_M
+        lda #$41        ; 8 byte steps
+        sta ADDRx_H
+
+        stz DATA0       ; disable all the zdepth
+        stz DATA0
+        stz DATA0
+        stz DATA0
+
+        rts
+
+    .endproc
+
+    .proc drag_initialise
+    
+        ; setup the four sprites for dragging
+        ; place after the cursor
+
+        ; cursor is at 0x13000
+        ; is 16*16 @ 8 bpp or 0x800 wide
+        ; so copy to 0x13800
+
+        ; copy data:
+        stz CTRL
+        stz ADDRx_L
+        lda #$38
+        sta ADDRx_M
+        lda #$11
+        sta ADDRx_H
+
+        ldy #(4*8)
+        ldx #0
+    .loop:
+        lda topleft, x
+        sta DATA0
+        inx
+        dey
+        bne -loop
+
+        ldy #(4*8)
+        ldx #0
+    .loop:
+        lda topright, x
+        sta DATA0
+        inx
+        dey
+        bne -loop
+
+        ldy #(4*8)
+        ldx #0
+    .loop:
+        lda bottomleft, x
+        sta DATA0
+        inx
+        dey
+        bne -loop
+
+        ldy #(4*8)
+        ldx #0
+    .loop:
+        lda bottomright, x
+        sta DATA0
+        inx
+        dey
+        bne -loop
+
+        ; setup sprites ready to be used when dragging
+        lda #$08
+        sta ADDRx_L
+        lda #$fc
+        sta ADDRx_M
+        lda #$11
+        sta ADDRx_H
+
+        ; 0x13800
+        int address = 0x13800 >> 5;
+        lda #<@(address)
+        sta DATA0
+        lda #>@(address)
+        sta DATA0
+        stz DATA0       ; x
+        stz DATA0       ; x+1
+        stz DATA0       ; Y
+        stz DATA0       ; y+1
+        stz DATA0       ; zdepth
+        stz DATA0       ; pallette offset
+
+        address = (0x13800 + 0x20) >> 5;
+        lda #<@(address)
+        sta DATA0
+        lda #>@(address)
+        sta DATA0
+        stz DATA0       ; x
+        stz DATA0       ; x+1
+        stz DATA0       ; Y
+        stz DATA0       ; y+1
+        stz DATA0       ; zdepth
+        stz DATA0       ; pallette offset
+
+        address = (0x13800 + 0x20 * 2) >> 5;
+        lda #<@(address)
+        sta DATA0
+        lda #>@(address)
+        sta DATA0
+        lda #1
+        stz DATA0       ; x
+        stz DATA0       ; x+1
+        stz DATA0       ; Y
+        stz DATA0       ; y+1
+        stz DATA0       ; zdepth
+        stz DATA0       ; pallette offset
+
+        address = (0x13800 + 0x20 * 3) >> 5;
+        lda #<@(address)
+        sta DATA0
+        lda #>@(address)
+        sta DATA0
+        stz DATA0       ; x
+        stz DATA0       ; x+1
+        stz DATA0       ; Y
+        stz DATA0       ; y+1
+        stz DATA0       ; zdepth
+        stz DATA0       ; pallette offset
+
+        rts
+
+    .align 32
+    .topleft:
+        .byte $00, $00, $00, $00
+        .byte $00, $00, $00, $00
+        .byte $00, $00, $00, $00
+        .byte $00, $00, $0f, $ff
+        .byte $00, $00, $ff, $ff
+        .byte $00, $0f, $ff, $00
+        .byte $00, $0f, $f0, $00
+        .byte $00, $0f, $f0, $00
+
+    .topright:
+        .byte $00, $00, $00, $00
+        .byte $00, $00, $00, $00
+        .byte $00, $00, $00, $00
+        .byte $ff, $f0, $00, $00
+        .byte $ff, $ff, $00, $00
+        .byte $00, $ff, $f0, $00
+        .byte $00, $0f, $f0, $00
+        .byte $00, $0f, $f0, $00
+
+    .bottomleft:
+        .byte $00, $0f, $f0, $00
+        .byte $00, $0f, $f0, $00
+        .byte $00, $0f, $ff, $00
+        .byte $00, $00, $ff, $ff
+        .byte $00, $00, $0f, $ff
+        .byte $00, $00, $00, $00
+        .byte $00, $00, $00, $00
+        .byte $00, $00, $00, $00
+
+    .bottomright:
+        .byte $00, $0f, $f0, $00
+        .byte $00, $0f, $f0, $00
+        .byte $00, $ff, $f0, $00
+        .byte $ff, $ff, $00, $00
+        .byte $ff, $f0, $00, $00
+        .byte $00, $00, $00, $00
+        .byte $00, $00, $00, $00
+        .byte $00, $00, $00, $00
+    .endproc
+
+    .endscope
+}
+
+public override void Initialise()
+{
+    Init.Add(Proc);
+    Setup();
+}
