@@ -9,6 +9,8 @@ private static byte InactiveBorderColour = 0xa7;
 private static byte WindowText = 0x01;
 private static byte InactiveWindowText = 0x0c;
 
+private static bool DrawWindowMap = false;
+
 private static void Setup()
 {
     ; VRAM Map
@@ -62,6 +64,11 @@ private static void Setup()
 
     .const max_windows = 16
 
+    if (DrawWindowMap)
+    {
+        .const debug_window_map = 0x9000
+    }
+
     .window_data:
     for(var i = 0; i < 16; i++)
     {
@@ -101,7 +108,6 @@ private static void Proc()
 
     .proc initialise
 
-        .const screensize = 960
         ; setup display
 
         ; disable layer 0
@@ -115,11 +121,20 @@ private static void Proc()
 
         stz L1_MAPBASE  ; set mapbase to 0
 
-        ; clear vram from start of layer 1
-        stz ADDRx_L
-        stz ADDRx_M
-        lda #$10
-        sta ADDRx_H
+        if (DrawWindowMap)
+        {
+            lda DC_VIDEO
+            ora #$10        ; enable layer 0
+            sta DC_VIDEO
+
+            lda #$68
+            sta L0_CONFIG
+            lda #(debug_window_map >> 9)
+            sta L0_MAPBASE
+
+            lda L1_TILEBASE
+            sta L0_TILEBASE
+        }
 
         lda #2
         sta CTRL
@@ -131,6 +146,67 @@ private static void Proc()
     
         lda #$ff
         sta current_window
+
+        jsr clear_screen
+
+        ; enable the mouse
+        sec
+        jsr SCREEN_MODE
+        lda #1              ; mouse visible
+        jsr MOUSE_CONFIG
+
+        ; clear memory, only need to clear process id
+        ldx #0
+        ldy #max_windows
+    .loop:
+        stz window_data + window_processid_offset, x
+        
+        clc
+        txa
+        adc #16
+        tax
+
+        dey
+        bne -loop
+
+        ; set base of application vram
+        stz vram_addr_l
+        lda #$3c
+        sta vram_addr_m
+        lda #$10            ; add stepping here, as it will always be by one.
+        sta vram_addr_h 
+
+        ; clear window map bank
+        lda RAM_BANK
+        pha
+
+        jsr clear_map
+
+        pla
+        sta RAM_BANK
+
+        jsr drag_initialise
+
+        stz bench_general:mouse_x
+        stz bench_general:mouse_y
+        stz bench_general:prev_mouse_x
+        stz bench_general:prev_mouse_y
+        stz bench_general:mouse_buttons
+        stz bench_general:prev_mouse_buttons
+        
+        rts
+
+    .endproc
+
+    .proc clear_screen
+
+        .const screensize = 960
+
+        ; clear vram from start of layer 1
+        stz ADDRx_L
+        stz ADDRx_M
+        lda #$10
+        sta ADDRx_H
 
         ; write to data0 128*60*2/16=960 times.
         ldx #<screensize
@@ -184,36 +260,14 @@ private static void Proc()
         jmp -loop
 
     .done:
-        ; enable the mouse
-        sec
-        jsr SCREEN_MODE
-        lda #1              ; mouse visible
-        jsr MOUSE_CONFIG
 
-        ; clear memory, only need to clear process id
-        ldx #0
-        ldy #max_windows
-    .loop:
-        stz window_data + window_processid_offset, x
-        
-        clc
-        txa
-        adc #16
-        tax
+        rts
 
-        dey
-        bne -loop
+    .endproc
 
-        ; set base of application vram
-        stz vram_addr_l
-        lda #$3c
-        sta vram_addr_m
-        lda #$10            ; add stepping here, as it will always be by one.
-        sta vram_addr_h 
-
-        ; clear window map bank
-        lda RAM_BANK
-        pha
+    ; clears map
+    ; ** CHANGES BANK **
+    .proc clear_map
 
         lda #bench_general:bank_windowmap
         sta RAM_BANK
@@ -234,14 +288,10 @@ private static void Proc()
         dex
         bne -loop
 
-        pla
-        sta RAM_BANK
-
-        jsr drag_initialise
-
         rts
 
     .endproc
+
 
     ; ** can be called by applications **
     ; creates a window and sets it to the lowest Z Order so it is displayed
@@ -275,18 +325,16 @@ private static void Proc()
         lda window_data + window_processid_offset, x
         beq found_position
 
+        inc window_data + window_zorder_offset, x
+
         iny
-        cpy #max_windows + 1
+        cpy #max_windows
         beq error_no_space
 
         clc
         txa
         adc #16
         tax
-
-        lda window_data + window_processid_offset, x
-        bne -loop       ; only inc windows with a process id
-        inc window_data + window_zorder_offset, x
 
         jmp -loop
 
@@ -324,7 +372,7 @@ private static void Proc()
         lda window_left
         sta window_data + window_left_offset, x
 
-        stz window_data + window_zorder_offset, x
+        stz window_data + window_zorder_offset, x ; new windows should always be top
 
         lda window_title
         sta window_data + window_title_offset, x   
@@ -337,10 +385,10 @@ private static void Proc()
         phx
 
     .loop:
-        cpy #max_windows + 1
+        iny
+        cpy #max_windows
         beq +done
         
-        iny
         clc
         txa
         adc #16
@@ -407,6 +455,44 @@ private static void Proc()
         jmp -loop
         
     .done:
+        pla
+        pha
+        jsr draw_window_map
+
+        ; now blur the previous window and draw.
+        lda #bench_general:bank_bench
+        sta RAM_BANK
+
+        jsr blur_current_window
+
+        lda #bench_general:bank_bench
+        sta RAM_BANK
+
+        ; draw new window
+        pla
+        pha
+        sta current_window
+
+        sec
+        jsr draw_window
+
+        lda bench_general:return_rambank
+        sta RAM_BANK
+
+        pla
+        clc
+        rts
+
+    .endproc
+
+    ; draw a window onto the map
+    ; ** CHANGES BANK **
+    ; required window top, left, height and width to be set
+    ; Inputs:
+    ; A: window
+    .proc draw_window_map
+        pha
+
         ; write in window map
         lda #bench_general:bank_windowmap
         sta RAM_BANK
@@ -426,7 +512,6 @@ private static void Proc()
         ; left, top should now point to the location in the window map
 
         pla             ; get window id
-        pha 
 
         ; loop through and set all entries in the map to the window id. add 128 each line.
         ldx window_height
@@ -450,33 +535,11 @@ private static void Proc()
         pla
 
         ldy window_width
-        iny
     
         jmp -loop
 
     .done:
-        ; now blur the previous window and draw.
-        lda #bench_general:bank_bench
-        sta RAM_BANK
 
-        jsr blur_current_window
-
-        lda #bench_general:bank_bench
-        sta RAM_BANK
-
-        ; draw new window
-        pla
-        pha
-        sta current_window
-
-        sec
-        jsr draw_window
-
-        lda bench_general:return_rambank
-        sta RAM_BANK
-
-        pla
-        clc
         rts
 
     .endproc
@@ -541,6 +604,33 @@ private static void Proc()
         lda window_data + window_height_offset, x
         sta height
 
+        ; need to move all windows between 0 and the current window's zlevel down one.
+        lda window_data + window_zorder_offset, x
+        sta drawing_window
+
+        phx
+        ldx #0
+
+    .loop:
+        lda window_data + window_processid_offset, x    ; ignore not set
+        beq not_lessthan 
+
+        lda window_data + window_zorder_offset, x
+        cmp drawing_window
+        bpl not_lessthan
+
+        inc window_data + window_zorder_offset, x
+
+    .not_lessthan:
+        txa
+        clc
+        adc #16
+        tax
+        bne -loop
+
+        plx
+        stz window_data + window_zorder_offset, x ; bring to top
+
         lda #bench_general:bank_windowmap
         sta RAM_BANK
  
@@ -582,12 +672,16 @@ private static void Proc()
         pla
 
         ldy width
-        iny
     
         jmp -loop
 
     .done:
         pla
+
+        if (DrawWindowMap)
+        {
+            jsr draw_windowmap_to_layer1
+        }
 
         rts
 
@@ -595,6 +689,7 @@ private static void Proc()
 
     ; draw window, will stomp on the current display
     ; assumes bank 1 is active
+    ; does not update the map
     ; inputs
     ; A window ID,
     ; Carry - if set its the top window
@@ -878,7 +973,7 @@ private static void Proc()
         jsr bench_process:get_bank
         sta RAM_BANK
 
-        jsr bench_general:application_focus
+        jsr bench_general:application_focus ; fire the event handler in the application
 
         lda #bench_general:bank_bench
         sta RAM_BANK
@@ -999,20 +1094,22 @@ private static void Proc()
         lda #bench_general:bank_bench
         sta RAM_BANK
         
-        cpx current_window
-        bne redraw_part
-        lda drawing_window
-        sec                 ; top window
-        jsr draw_window     ; if we're drawing the current window, we know its got focus
+    ;     jmp redraw_part
 
-        pla
-        sta RAM_BANK
+    ;     cpx current_window
+    ;     bne redraw_part
+    ;     lda drawing_window
+    ;     sec                 ; top window
+    ;     jsr draw_window     ; if we're drawing the current window, we know its got focus
 
-        stz DC_BORDER
+    ;     pla
+    ;     sta RAM_BANK
 
-        rts
+    ;     stz DC_BORDER
 
-    .redraw_part:
+    ;     rts
+
+    ; .redraw_part:
 
         ; itterate through the map looking for visible pixels, otherwise dont write
         ; dont update the border
@@ -1156,6 +1253,179 @@ private static void Proc()
         rts
 
     .endproc
+
+    ; redraws the whole screen
+    ; ** CHANGES BANK **
+    .proc draw_screen
+
+        jsr clear_screen
+        jsr clear_map   ; changes bank
+
+        lda #bench_general:bank_bench
+        sta RAM_BANK
+
+        ldy #$10 ; We jump out at 0, so +1 for 0x0f -> 0x00.
+        lda #$0f 
+        sta bench_window:drawing_window
+
+    .start_loop:
+        ldx #0
+
+    .loop:
+        lda window_data + window_zorder_offset, x
+        cmp bench_window:drawing_window
+
+        bne no_match
+
+        ; need to populate window_top, window_left, window_width, and window_height
+        ; for draw_window_map
+        lda window_data + window_top_offset, x
+        sta window_top
+        lda window_data + window_left_offset, x
+        sta window_left
+        lda window_data + window_width_offset, x
+        sta window_width
+        lda window_data + window_height_offset, x
+        sta window_height
+
+        txa
+        clc
+        ror ; / 16
+        ror
+        ror
+        ror
+
+        clc
+        phx
+        pha
+        phy
+
+        jsr draw_window_map ; changes bank
+        
+        lda #bench_general:bank_bench
+        sta RAM_BANK
+
+        ply
+        cpy #1
+        bne not_top
+        sec
+        jmp +done
+    .not_top:
+        clc
+    .done:
+
+        pla
+        phy
+        jsr draw_window
+
+        ply
+        plx
+
+        jmp done_this_loop
+
+    .no_match:
+
+        clc
+        txa
+        adc #16
+        tax
+
+        bne -loop
+
+    .done_this_loop:
+        dec bench_window:drawing_window
+        dey
+        bne -start_loop
+
+        if (DrawWindowMap)
+        {
+            jsr draw_windowmap_to_layer1
+        }
+
+        rts
+
+    .endproc
+
+    if (DrawWindowMap)
+    {
+        ; used to debug the window map
+        ; ** CHANGES BANK **
+        .proc draw_windowmap_to_layer1
+
+            stz CTRL
+            lda #<(debug_window_map)
+            sta ADDRx_L
+            lda #>(debug_window_map)
+            sta ADDRx_M
+            lda #^(debug_window_map) + $10 
+            sta ADDRx_H
+
+            lda #bench_general:bank_windowmap
+            sta RAM_BANK
+
+            stz bench_general:zp_pointer
+            lda #$a0
+            sta bench_general:zp_pointer + 1
+
+            ldx #60 ; rows
+        .loop:
+            ldy #80 ; cols            
+
+        .loop:
+            lda (bench_general:zp_pointer)
+            cmp #$ff
+            beq +write_skip
+
+            lda #$2e
+            sta DATA0
+
+            lda (bench_general:zp_pointer)
+            inc
+            sta DATA0   ; colour, steps 2
+            jmp +done_tile
+
+        .write_skip:
+            stz DATA0
+            stz DATA0
+        .done_tile:            
+            inc bench_general:zp_pointer            
+
+            bne skip
+            inc bench_general:zp_pointer + 1
+
+        .skip:
+
+            dey
+            bne -loop
+
+            dex
+            beq done
+
+            lda bench_general:zp_pointer
+            and #$80
+            clc
+            adc #$80
+            sta bench_general:zp_pointer
+            lda bench_general:zp_pointer+1
+            adc #0
+            sta bench_general:zp_pointer+1
+
+            clc
+            lda ADDRx_L
+            adc #96
+            sta ADDRx_L
+            lda ADDRx_M
+            adc #0
+            sta ADDRx_M
+            ; dont bother with the H as we cant get there.
+
+            jmp --loop
+
+        .done:
+            rts
+
+        .endproc
+    }
 
     .endscope
 }

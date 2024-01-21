@@ -183,6 +183,8 @@ public static void Proc()
 
     .endproc
 
+    ; ends dragging and moves the current focused window to the new coordinates
+    ; ** CHANGES BANK **
     .proc end_dragging
 
         stz dragging
@@ -201,6 +203,33 @@ public static void Proc()
         stz DATA0
         stz DATA0
 
+        ; get left
+        sec
+        lda bench_general:mouse_x
+        sbc frame_left
+        pha                     ; left
+
+        ; get top
+        ldx bench_general:mouse_y
+        phx                     ; top
+
+        lda current_window
+
+        clc ; * 16
+        rol
+        rol
+        rol
+        rol 
+        tax
+
+        pla     ; get top
+        sta window_data + window_top_offset, x
+
+        pla     ; get left
+        sta window_data + window_left_offset, x
+
+        jsr draw_screen
+
         rts
 
     .endproc
@@ -213,6 +242,8 @@ public static void Proc()
         ; cursor is at 0x13000
         ; is 16*16 @ 8 bpp or 0x800 wide
         ; so copy to 0x13800
+
+        stz dragging
 
         ; copy data:
         stz CTRL

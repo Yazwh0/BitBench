@@ -8,43 +8,23 @@ import Switcher="bench\switcher.bmasm";
 import Scheduler="bench\scheduler.bmasm";
 import Window="bench\window.bmasm";
 
+
 .machine CommanderX16R42
     BM.X16Header();
+
+    bool DebugZOrder = false;
 
     .scope bench_main
 
     ; initialise the system
     sei
-    
+
     ; reset the stack, we never return
     ldx #$ff
     txs
     phx ; add a empty entry for the stack pointer
 
     jsr initialise
-
-;     lda #$3
-;     sta bench_window:window_top
-;     lda #$27
-;     sta bench_window:window_left
-;     lda #$10
-;     sta bench_window:window_width
-;     lda #$30
-;     sta bench_window:window_height
-;     lda #<title3
-;     sta bench_window:window_title
-;     lda #>title3
-;     sta bench_window:window_title + 1
-
-;     jmp +skip
-;  .title3:
-//      BM.IsoPetscii("STATUS");
-;  .skip:
-
-;     lda #01
-;     jsr bench_window:create_window
-;     sec
-;     jsr bench_window:draw_window
 
     lda #11
     ldx #<filename
@@ -60,8 +40,6 @@ import Window="bench\window.bmasm";
 
 .loop: 
     jmp loop
-
-
 
     .proc initialise     
 
@@ -110,6 +88,12 @@ import Window="bench\window.bmasm";
 
         rts
 
+    .endproc
+
+    .proc brk_hit
+        ; todo: handle brk
+        stp
+        jmp brk_hit    
     .endproc
 
     .proc irq
@@ -188,16 +172,51 @@ import Window="bench\window.bmasm";
         jsr GETIN
         sta bench_general:keyboard ; todo, if non-zero, send message to active window, like mouse moves
 
+        lda #bench_general:bank_bench
+        sta RAM_BANK
+
         ; handle mouse movement
         Global.Call_HandleMouse();
+
+        if (DebugZOrder)
+        {
+            stz ADDRx_L
+            stz ADDRx_M
+            lda #$10
+            sta ADDRx_H
+
+            ldx #0
+            ldy #$10
+        .loop:
+            lda bench_window:window_data + bench_window:window_zorder_offset, x
+            phx
+
+            tax
+            lda display_lookup, x
+            sta DATA0
+            lda #01
+            sta DATA0
+
+            plx
+            txa
+            clc
+            adc #$10
+            tax
+
+            dey
+            bne -loop
+
+            jmp skip_past_data
+        .display_lookup:
+            .byte $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $01, $02, $03, $04, $05, $06
+        .skip_past_data: 
+        }
 
         lda #01
         sta DC_BORDER
 
         ; check if we need to switch process
-        lda #bench_general:bank_bench  ; Bench uses bank 1.
-        sta RAM_BANK 
-
+        
         jsr bench_scheduler:reset    ; reset scheduler for the frame
         jsr bench_scheduler:get_next_process ; returns 0 if nothing to do
 
@@ -218,11 +237,6 @@ import Window="bench\window.bmasm";
         pla
 
         rti
-
-        ; todo: handle brk
-    .brk_hit:
-        stp
-        jmp brk_hit    
 
     .nothing_to_do:
         jsr bench_switcher:store_process
