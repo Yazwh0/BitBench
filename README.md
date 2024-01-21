@@ -66,6 +66,8 @@ Strong use of scopes has been used to ensure variables have good logical separat
 
 Additionally, the whole of the generated code can be viewed within VSCode.
 
+BitMagic is available via nuget, which means Unit Tests can be written to test the individual libraries. An example unit test project is included in the repository. These tests include testing for [side effects](https://github.com/Yazwh0/BitBench/blob/main/tests/BenchTests/Scheduler/OneNormal.cs#L69) for a complete test.
+
 ## Improvements
 
 As a proof of concept, there are significant pieces of functionality missing.
