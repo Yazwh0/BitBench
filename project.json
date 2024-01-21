@@ -1,6 +1,6 @@
 {
     "source": "src\\main.bmasm",
-    "sourceprg": "c:\\dev\\bitbench\\main.prg",
+    "outputFolder": "c:\\dev\\bitbench",
     "runSource": false,
     "startAddress": "2064",
     "CaptureChanges": true,

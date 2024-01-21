@@ -155,11 +155,24 @@ private static void Proc()
         lda #1              ; mouse visible
         jsr MOUSE_CONFIG
 
-        ; clear memory, only need to clear process id
+        ; clear memory
         ldx #0
         ldy #max_windows
     .loop:
+        stz window_data + window_width_offset, x
+        stz window_data + window_height_offset, x
+        stz window_data + window_top_offset, x
+        stz window_data + window_left_offset, x
+        stz window_data + window_title_offset, x
+        stz window_data + window_title_offset + 1, x
+        stz window_data + window_zorder_offset, x
         stz window_data + window_processid_offset, x
+        stz window_data + window_vram_addr_offset, x
+        stz window_data + window_vram_addr_offset + 1, x
+        stz window_data + window_vram_addr_offset + 2, x
+        stz window_data + window_vram_len_offset, x
+        stz window_data + window_vram_len_offset + 1, x
+        stz window_data + window_title_bank_offset, x
         
         clc
         txa

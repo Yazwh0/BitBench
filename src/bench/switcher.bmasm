@@ -88,7 +88,7 @@ private static void Proc()
     .loop:
         dey
         beq +data_copy_done
-        lda (bench_general:zp_pointer2), Y
+        lda (bench_general:zp_pointer2), Y      ; can generate warnings as can read uninitialised memory
         sta $00, Y
         jmp -loop
     .data_copy_done:
