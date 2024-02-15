@@ -1,4 +1,4 @@
-import BM="bench\BM.bmasm";
+import BM="BM.bmasm";
 import Global="bench\globals.bmasm";
 import Init="bench\initialisation.bmasm";
 import Process="bench\process.bmasm";

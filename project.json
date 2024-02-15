@@ -1,16 +1,17 @@
 {
     "source": "src\\main.bmasm",
     "outputFolder": "c:\\dev\\bitbench",
-    "runSource": false,
-    "CaptureChanges": true,
+    "directRun": false,
+    "autobootRun" : true,
     "memoryFillValue" : 192,
-    "emulatorDirectory" : "C:\\Documents\\Source\\x16-rom\\build\\x16",
-    "SdCardFiles": [
+    //"emulatorDirectory" : "C:\\dev\\X16emu\\R46",
+    // "sdCard" : "c:\\dev\\democard\\demo.vhd",
+    "sdCardFiles": [
     ],
-    "CompileOptions": {
+    "compileOptions": {
         "DisplaySegments": true,
         "BinFolder" : "Bin",
         "DisplayVariables" : false,
-        "Rebuild" : false
+        "Rebuild" : true
     }
 }
