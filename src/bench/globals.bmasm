@@ -15,7 +15,7 @@ private static void Setup()
     .segment bench_app_header $a000 $100
     .segment bench_window $a500 $200
 
-    .segment bench_zp, scope=bench_general
+    .segment bench_zp, scope:bench_general
 
     ; todo, match these with the api helper
     .const application_entry_l $a010
