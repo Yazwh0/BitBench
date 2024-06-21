@@ -8,7 +8,9 @@ It features Process Separation and Management, Memory Management, Windowing Syst
 
 BitBench has been designed to either act as a operating system, or as a window UI for a single application.
 
-It was written using [BitMagic:](https://github.com/Yazwh0/BitMagic) *a compiler, debugger and emulator for Windows and Linux*, as a form of [dog-fooding](https://en.wikipedia.org/wiki/Eating_your_own_dog_food).
+It was written using [BitMagic:](https://bitmagic.org) *a compiler, debugger and emulator for Windows and Linux*, as a form of [dog-fooding](https://en.wikipedia.org/wiki/Eating_your_own_dog_food).
+
+![Example](assets/bitbench.gif)
 
 ## Process
 
