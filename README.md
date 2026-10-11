@@ -6,6 +6,8 @@ It can act as an operating system, or as a windowed UI for a single application.
 
 I wrote it with [BitMagic](https://bitmagic.org) to put BitMagic through its paces, as a form of [dog-fooding](https://en.wikipedia.org/wiki/Eating_your_own_dog_food).
 
+![Example](assets/bitbench.gif)
+
 ## Processes
 
 Each process is loaded into its own base RAM bank. The first few bytes of the bank are a header that says how the process should be called, and holds jump vectors for when events happen.
