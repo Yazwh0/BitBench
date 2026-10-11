@@ -1,83 +1,57 @@
 # BitBench
 
-## Introduction
+BitBench is a proof of concept for an early Windows style UI on the [Commander X16](https://www.commanderx16.com/). It has process management, memory management, a windowing system and events, but no toolkit of controls for building a UI.
 
-BitBench is a proof of concept for a early Windows style UI for the [Commander X16](https://www.commanderx16.com/).
+It can act as an operating system, or as a windowed UI for a single application.
 
-It features Process Separation and Management, Memory Management, Windowing System and Events. It does not include a control toolkit for creating UIs.
+I wrote it with [BitMagic](https://bitmagic.org) to put BitMagic through its paces, as a form of [dog-fooding](https://en.wikipedia.org/wiki/Eating_your_own_dog_food).
 
-BitBench has been designed to either act as a operating system, or as a window UI for a single application.
+## Processes
 
-It was written using [BitMagic:](https://github.com/Yazwh0/BitMagic) *a compiler, debugger and emulator for Windows and Linux*, as a form of [dog-fooding](https://en.wikipedia.org/wiki/Eating_your_own_dog_food).
+Each process is loaded into its own base RAM bank. The first few bytes of the bank are a header that says how the process should be called, and holds jump vectors for when events happen.
 
-## Process
+The X16 has one processor and no way to isolate processes, so BitBench uses simple time slicing:
 
-Each process has a 'base' ram bank which it can be loaded into. The first few bytes of the bank define how the process should called, as well as jump vectors which can be called when various events take place.
+- On each VSYNC interrupt, the scheduler looks at the active processes and decides which one to switch to.
+- A process sets how often it's called, from every frame (1) to every 255 frames. A value of 0 makes it a *real time* process, called before any process that asks for every frame.
+- A process can hand back control once it's done with its time. If it doesn't, it's interrupted and another process is switched in.
+- The stack, and a block of zero page from `$22`, are preserved for each process, so from its point of view they never change. The process sets how many zero page bytes to keep in its header.
+- A process that calls the kernal or does other IO should disable interrupts first, so it isn't switched out and the kernal's own values aren't changed underneath it.
 
-As the X16 only has one processor with no capability for any type of process isolation, BitBench uses simple CPU time slicing to manage the difference processes.
+Up to 15 processes can run at once. There's no way to close one yet.
 
-Each VSYNC interrupt the scheduler looks at the processes that are active, and decides which to switch to.
+## Memory management
 
-A process sets how many frames it should be called between 1 and 255. If it sets this value to 0, it is designated a 'real time' process and will be called before any processes which request a update every frame using a value of 1.
-
-Once a process is done with its time allocation it can hand back control for another process to be switched to.
-
-If it doesn't hand back control, it will be interrupted and control handed to another process.
-
-The stack and a segment of the Zero Page from 0x22 will be preserved, so will not change from the point of view of the process. The number of bytes from 0x22 can be set by the application in its header.
-
-If the process needs to interact with the kernel or perform other IO operations it should disable the interrupts so that the application can be sure it is not switched out and essential kernel values are not changed.
-
-BitBench supports up to 15 applications running at one time.
-
-There is no current way to close an application.
-
-## Memory Management
-
-Memory management in BitBench is by RAM blocks within the 0x400 -> 0x9e00 range, as well as RAM banks from bank 0x01 upwards.
-
-An application can request memory via the API. For banks this is one at a time, but for blocks it can request a number of continuous blocks.
+Memory is handed out as RAM blocks in the `$0400` to `$9e00` range, and as RAM banks from bank 1 upwards. A process asks for memory through the API: banks one at a time, or a number of contiguous blocks.
 
 ## Windows
 
-An application can create as many windows as it wants, however there is a limit to 16 windows at one time.
+A process can create windows, up to 16 at a time across the system.
 
-Events are currently limited, but arrive via a callback that is defined in the application's header. These are driven from the interrupt so will arrive while the application is running elsewhere.
+- Events arrive through a callback set in the process's header. They're driven by the interrupt, so they can arrive while the process is busy elsewhere.
+- The API updates a window's contents from an x, y position using the data structure that's uploaded to VRAM. A second call is needed to refresh the window.
+- There's no way to close a window or add extra control icons yet.
 
-The API allows the application to update data from a given x,y coordinate using tbe data structure that will be uploaded into VRAM.
+## How BitBench uses BitMagic
 
-Currently a second API call is needed to refresh the window's contents.
+BitMagic's C# macros are effectively unlimited, so BitBench is built on a framework written in them.
 
-There is no current way to close a window, or add extra control icons.
+- **Library sections.** Each library splits its code into a `setup` section, for its segments, scopes and variables, and a `code` section, for its procedures. Most are plain bmasm (`file library`); the ones with C# helpers add their sections from `Initialise()`. `main.bmasm` decides where the code goes with `place code`, so there's no mystery in what ends up in the `.prg` or `.bin` files. See [Libraries](https://bitmagic.org/templateengine/libraries).
+- **Typed variables.** Variables are defined with a type. The compiler doesn't use it, but the debugger does: a location defined as a `ushort` shows as a two byte value in the watch window.
+- **Source reuse instead of linking.** Functionality is included or left out at build time. For example, the window handler registers a callback for the mouse. That happens in the macro code before the assembly is generated, so if mouse support isn't needed the whole call chain is dropped from the binary. It doesn't matter much for BitBench, but it shows how source reuse can produce tighter code than a traditional linker.
+- **Scopes.** Variables are kept logically separate with scopes, which also give the calling applications an API.
+- **Generated code.** All of the generated code can be viewed in VSCode.
+- **Unit tests.** BitMagic is available on NuGet, so the libraries can have [unit tests](https://github.com/Yazwh0/BitBench/tree/main/tests/BenchTests). The tests include checking for [side effects](https://github.com/Yazwh0/BitBench/blob/main/tests/BenchTests/Scheduler/OneNormal.cs#L69).
 
-## BitMagic
+## What's missing
 
-This project was developed to shake down the BitMagic development system.
+As a proof of concept, a lot is missing:
 
-Because BitMagic has a essentially limitless 'macro' capabilities, we can build a framework to develop the BitBench system.
-
-The first part of this is the 'initialisation' library, which lets the referenced libraries call macros to define functionality. This lets us write the functionality which will be included in the `.prg` or `.bin` files, as well as ensure the segments, scopes and variables are setup correctly. As the developer controls this process, there should be no mystery in how this is performed.
-
-The definition of the variables have a variable type associated with them. While this isn't used by the compiler, it is used by the debugger. So if a location is RAM is set to be a `ushort`, then displaying it in the watch window will use the correct format for a two byte value, greatly enhancing the debugging experience.
-
-BitMagic's compiler is enhanced by source code reuse (rather than linking in a binary) which lets us include or exclude functionality based on what we need. For example in BitBench the window handler registers a callback for the mouse functionality. As this is performed in the 'macro' code before the asm is generated, it means if mouse support isn't needed the whole call chain is dropped from the final binary. While not useful for BitBench, its a good example of how source code reuse can produce tighter applications compared to the traditional linked assemblers.
-
-Strong use of scopes has been used to ensure variables have good logical separation. These scopes also offer a way of creating an API for the calling applications.
-
-Additionally, the whole of the generated code can be viewed within VSCode.
-
-BitMagic is available via nuget, which means [Unit Tests](https://github.com/Yazwh0/BitBench/tree/main/tests/BenchTests) can be written to test the individual libraries. An example unit test project is included in the repository. These tests include testing for [side effects](https://github.com/Yazwh0/BitBench/blob/main/tests/BenchTests/Scheduler/OneNormal.cs#L69) for a complete test.
-
-## Improvements
-
-As a proof of concept, there are significant pieces of functionality missing.
-
-- Processes cannot be terminated.
-- Windows cannot be closed.
-- The window updating mechanism is unnecessarily slow.
-- Events should only have one call back vector so we're not constrained.
-- Need a custom character set that features lowercase as well as inverted tiles.
-- Windows should have icons for closing or other operations.
-- Windows cannot currently be resized.
-- No form of modal (messagebox) windows.
-- Create a UI toolkit for buttons, textboxes, etc.
+- Processes can't be terminated.
+- Windows can't be closed or resized.
+- Updating a window is slower than it needs to be.
+- Events should use a single callback vector, so they're not constrained.
+- It needs a custom character set with lowercase and inverted tiles.
+- Windows should have icons for closing and other operations.
+- There are no modal windows, such as message boxes.
+- There's no UI toolkit for buttons, text boxes and so on.

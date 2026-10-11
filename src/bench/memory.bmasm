@@ -1,13 +1,11 @@
-library BitBench.Memory.Manager;
+file library
 
 /* 
 // Memory is given out in 256byte blocks
 */
  
-import Init="initialisation.bmasm";
 
-private static void Setup()
-{
+section setup
     .segment bench_memory, scope=bench_memory
 
     .padvar byte[256] blocks
@@ -21,10 +19,8 @@ private static void Setup()
     .padvar byte scratch_b
 
     .endsegment
-}
 
-private static void Proc()
-{
+section code
     .scope bench_memory
     
     ; banks:
@@ -318,10 +314,3 @@ private static void Proc()
     .endproc
 
     .endscope
-}
-
-public override void Initialise()
-{
-    Init.Add(Proc);
-    Setup();
-}

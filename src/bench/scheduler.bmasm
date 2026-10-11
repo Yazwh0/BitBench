@@ -1,9 +1,6 @@
-library BitBench.Scheduler.Manager;
+file library
 
-import Init="initialisation.bmasm";
- 
-private static void Setup()
-{
+section setup
     
 /*
 //    Scheduler needs:
@@ -47,10 +44,8 @@ private static void Setup()
 
     .endscope
     .endsegment
-}
 
-private static void Proc()
-{
+section code
     .scope bench_scheduler
 
     .proc initialise
@@ -264,11 +259,3 @@ private static void Proc()
     .endproc
 
     .endscope
-}
-
-public override void Initialise()
-{
-    Init.Add(Proc);
-    Setup();
-}
-

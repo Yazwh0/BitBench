@@ -1,6 +1,5 @@
 library BitBench.Switcher.Manager;
 
-import Init="initialisation.bmasm";
 
 private static void Setup()
 {
@@ -156,15 +155,15 @@ public static void SetZpPointersRamBankToCurrentProcess()
     rol 
     rol     ; * 4
     tax
-    lda bench_process:process_data + bench_process:StackBlock, x
+    lda bench_process:process_table + bench_process:StackBlock, x
     sta bench_general:zp_pointer + 1
     stz bench_general:zp_pointer
 
-    lda bench_process:process_data + bench_process:DataBlock, x
+    lda bench_process:process_table + bench_process:DataBlock, x
     sta bench_general:zp_pointer2 + 1
     stz bench_general:zp_pointer2
 
-    lda bench_process:process_data + bench_process:PrimaryBank, x
+    lda bench_process:process_table + bench_process:PrimaryBank, x
     sta RAM_BANK                            ; fetch primary bank and switch
 }
 
@@ -212,6 +211,6 @@ public static void StoreCurrentProcess()
 
 public override void Initialise()
 {
-    Init.Add(Proc);
-    Setup();
+    Section.Get("setup").Add(Owner, Setup);
+    Section.Get("code").Add(Owner, Proc);
 }

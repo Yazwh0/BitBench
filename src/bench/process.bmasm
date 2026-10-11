@@ -1,9 +1,6 @@
-library BitBench.Process.Manager;
+file library
 
-import Init="initialisation.bmasm";
- 
-private static void Setup()
-{
+section setup
 /*
 //  Process needs:
 //  byte: Primary Ram Bank
@@ -14,6 +11,7 @@ private static void Setup()
     .segment bench_process, scope=bench_process
     
     .process_data:
+    .export process_table process_data      ; labels are private, the switcher reads the table from outside
     for(var i = 0; i < 256/4; i++)
     {
         .padvar byte primary_bank_@(i)
@@ -23,10 +21,8 @@ private static void Setup()
     }
 
     .endsegment
-}
 
-private static void Proc()
-{
+section code
     .scope bench_process
 
     .const PrimaryBank = 0
@@ -398,10 +394,3 @@ private static void Proc()
     .endproc
 
     .endscope
-}
-
-public override void Initialise()
-{
-    Init.Add(Proc);
-    Setup();
-}

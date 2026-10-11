@@ -9,7 +9,6 @@ public class Create
         var (emulator, snapshot) = await X16TestHelper.EmulateTemplateChanges(@"
                 import Globals=""..\..\..\..\..\src\bench\globals.bmasm"";
                 import Scheduler=""..\..\..\..\..\src\bench\scheduler.bmasm"";
-                import Init=""..\..\..\..\..\src\bench\initialisation.bmasm"";
                 import Memory=""..\..\..\..\..\src\bench\memory.bmasm"";
                 import Process=""..\..\..\..\..\src\bench\process.bmasm"";
                 .machine CommanderX16R42
@@ -40,7 +39,7 @@ public class Create
                 stp
 
                 ; create procs
-                Init.Setup();                
+                place code
                 ");
 
         snapshot.Snap();

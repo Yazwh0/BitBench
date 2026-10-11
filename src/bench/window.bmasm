@@ -1,7 +1,6 @@
 library BitBench.Window.Manager;
 
 import Dragging="window_dragging.bmasm";
-import Init="initialisation.bmasm";
 import Global="globals.bmasm";
 
 private static byte BorderColour = 0xa9;
@@ -99,7 +98,6 @@ private static void Setup()
     .padvar byte drawing_window
     .endsegment
 
-    Global.AddMouseHandler("bench_window:mouse_move");
 }
 
 private static void Proc()
@@ -1537,9 +1535,13 @@ public static void OutputCharacterA( string colour)
 
 public override void Initialise()
 {
-    Init.Add(Proc);
-    Init.Add(Dragging.Proc);
-    Setup();
-    Dragging.Setup();
+    // called when the mouse moves; main places the 'mouse' section in its main loop
+    Section.Get("mouse").Add(Owner, () =>
+    {
+        jsr bench_window:mouse_move
+    });
+
+    Section.Get("setup").Add(Owner, Setup);
+    Section.Get("code").Add(Owner, Proc);
 }
 

@@ -1,10 +1,8 @@
-library BitBench.WindowDragging.Manager;
+file library
 
-import Init="initialisation.bmasm";
 import Global="globals.bmasm";
 
-public static void Setup()
-{
+section setup
     .segment bench_window, scope=bench_window
     
     .padvar byte dragging               ; 0: not dragging, -1: click on top row, 1: dragging
@@ -13,10 +11,8 @@ public static void Setup()
     .padvar byte frame_height
     
     .endsegment
-}
 
-public static void Proc()
-{
+section code
     .scope bench_window
 
     ; store values for dragging
@@ -392,10 +388,3 @@ public static void Proc()
     .endproc
 
     .endscope
-}
-
-public override void Initialise()
-{
-    Init.Add(Proc);
-    Setup();
-}

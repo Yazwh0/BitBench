@@ -1,11 +1,6 @@
-library BitBench.Globals.Manager;
+file library
 
-import Init="initialisation.bmasm";
-
-private static HashSet<string> _mouse = new();
-
-private static void Setup()
-{
+section setup
     ; define segment ranges
     .segment bench_zp $d4 $2c
     .segment bench_memory $a000 $200
@@ -49,10 +44,8 @@ private static void Setup()
     .padvar ushort zp_scratch2
 
     .endsegment
-}
 
-private static void Proc()
-{
+section code
     .scope bench_general
 
     ; multiplys to 8bit numbers in factor1/2, 
@@ -78,24 +71,3 @@ private static void Proc()
     .endproc
 
     .endscope
-}
-
-public static void Call_HandleMouse()
-{
-    foreach(var callback in _mouse)
-    {
-        jsr @(callback)
-    }
-}
-
-public static void AddMouseHandler(string name)
-{    
-    _mouse.Add(name);
-}
-
-public override void Initialise()
-{
-    Init.Add(Proc);
-    Setup();
-}
- 

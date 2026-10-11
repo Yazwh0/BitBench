@@ -1,6 +1,5 @@
 import BM="bench\BM.bmasm";
 import Globals="bench\globals.bmasm";
-import Init="bench\initialisation.bmasm";
 import Process="bench\process.bmasm";
 import Memory="bench\memory.bmasm";
 import ApiHelper="bench\apihelper.bmasm";
@@ -41,5 +40,5 @@ jsr bitbench_scheduler:get_next_process
 
 stp
 
-; create procs
-Init.Setup();       
+; every library's procs
+place code

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -17,5 +17,5 @@
   </ItemGroup>
   <ItemGroup />
   <!-- c:\Documents\Source\BitMagic\BitMagic.X16Emulator\BitMagic.X16Emulator.TestHelper\bin\Debug\BitMagic.X16Emulator.TestHelper.1.0.0.nupkg -->
-  <!-- <Reference Include="C:\Documents\Source\BitMagic\BitMagic.X16Emulator\BitMagic.X16Emulator\bin\Debug\net6.0\BitMagic.X16Emulator.dll" /> -->
+  <!-- <Reference Include="C:\Documents\Source\BitMagic\BitMagic.X16Emulator\BitMagic.X16Emulator\bin\Debug\net10.0\BitMagic.X16Emulator.dll" /> -->
 </Project>

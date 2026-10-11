@@ -1,6 +1,5 @@
 import BM="BM.bmasm";
 import Global="bench\globals.bmasm";
-import Init="bench\initialisation.bmasm";
 import Process="bench\process.bmasm";
 import Memory="bench\memory.bmasm";
 import ApiHelper="bench\apihelper.bmasm";
@@ -38,15 +37,15 @@ import Window="bench\window.bmasm";
 
     cli
 
-.loop: 
+.loop:
     jmp loop
 
-    .proc initialise     
+    .proc initialise
 
         cld
 
         lda #1          ; Bench uses bank 1.
-        sta RAM_BANK 
+        sta RAM_BANK
 
         sta IEN         ; vsync interrupt only
         stz CTRL
@@ -65,7 +64,7 @@ import Window="bench\window.bmasm";
 
     .proc override_irq
 
-        // we need to override the whole handler, 
+        // we need to override the whole handler,
         // so we use the vector at $fffe instead of $314
         // this is because the routine at $314 isn't the whole interrupt handler.
 
@@ -93,7 +92,7 @@ import Window="bench\window.bmasm";
     .proc brk_hit
         ; todo: handle brk
         stp
-        jmp brk_hit    
+        jmp brk_hit
     .endproc
 
     .proc irq
@@ -108,7 +107,7 @@ import Window="bench\window.bmasm";
 
         ; check if its a brk
         tsx
-        lda $106, x     ; +3 for stack pointer, plus three above 
+        lda $106, x     ; +3 for stack pointer, plus three above
         and #$10
         bne brk_hit
 
@@ -123,10 +122,12 @@ import Window="bench\window.bmasm";
 
         ; call kernel routies
         stz ROM_BANK
+        lda #8 ; get ps2data
+        jsr extapi
         jsr mouse_scan
         jsr joystick_scan
         jsr SCNKEY
-        ; clock_update isn't exposed so cannot call 
+        ; clock_update isn't exposed so cannot call
 
         lda #05
         sta DC_BORDER
@@ -134,7 +135,7 @@ import Window="bench\window.bmasm";
         ; fetch and store mouse movement
         lda bench_general:mouse_buttons
         sta bench_general:prev_mouse_buttons
-        
+
         lda bench_general:mouse_x
         sta bench_general:prev_mouse_x
         lda bench_general:mouse_y
@@ -148,7 +149,7 @@ import Window="bench\window.bmasm";
         clc
         lda bench_general:mouse_x
         ror bench_general:mouse_x + 1
-        ror 
+        ror
         clc
         ror bench_general:mouse_x + 1
         ror
@@ -176,7 +177,7 @@ import Window="bench\window.bmasm";
         sta RAM_BANK
 
         ; handle mouse movement
-        Global.Call_HandleMouse();
+        place mouse
 
         if (DebugZOrder)
         {
@@ -209,23 +210,23 @@ import Window="bench\window.bmasm";
             jmp skip_past_data
         .display_lookup:
             .byte $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $01, $02, $03, $04, $05, $06
-        .skip_past_data: 
+        .skip_past_data:
         }
 
         lda #01
         sta DC_BORDER
 
         ; check if we need to switch process
-        
+
         jsr bench_scheduler:reset    ; reset scheduler for the frame
         jsr bench_scheduler:get_next_process ; returns 0 if nothing to do
 
-        beq nothing_to_do               
+        beq nothing_to_do
 
-        jsr bench_switcher:activate_process_interrupt 
+        jsr bench_switcher:activate_process_interrupt
 
         ; stack here will always have these values even if switched
-        pla 
+        pla
         sta ROM_BANK
         pla
         sta RAM_BANK
@@ -258,7 +259,7 @@ import Window="bench\window.bmasm";
 
         stz DC_BORDER
 
-        rti        
+        rti
     .endproc
 
     .proc idle_loop
@@ -285,11 +286,11 @@ import Window="bench\window.bmasm";
     ApiHelper.Header("TEST", "entry", "exit", "focus", "blur", 1, 1);
 
     const int width = 0x30-2;
-    const int height = 0x10-2; 
+    const int height = 0x10-2;
 
     .constvar ushort address = $22
 
-    .entry:    
+    .entry:
         sei
 
         lda #$05
@@ -325,7 +326,7 @@ import Window="bench\window.bmasm";
         ldy #<@(width * height * 2)
 
         lda #0
-    .loop:    
+    .loop:
         sta (address)
         inc address
         bne no_overflow
@@ -363,7 +364,7 @@ import Window="bench\window.bmasm";
         adc xpos_chg
         sta curr_x
 
-    ; y 
+    ; y
         clc
         lda curr_y
         adc ypos_chg
@@ -374,7 +375,7 @@ import Window="bench\window.bmasm";
         lda xpos_chg
         cmp #1
         bne +subtract
-    
+
         clc
         lda address
         adc #2
@@ -401,7 +402,7 @@ import Window="bench\window.bmasm";
         lda ypos_chg
         cmp #1
         bne +subtract
-    
+
         clc
         lda address
         adc #@(width * 2)
@@ -459,13 +460,13 @@ import Window="bench\window.bmasm";
         sta ypos_chg
 
     .no_change:
-    
+
         sei
 
         ; Update the whole window buffer
         lda window_id
         sta bench_window:content_window_id
-        
+
         stz bench_window:content_top
         stz bench_window:content_left
         lda #<@(width * height * 2)
@@ -562,7 +563,7 @@ import Window="bench\window.bmasm";
     ApiHelper.Header("TEST2", "entry", "exit", "focus", "blur", 1, 1);
 
     const int width2 = 0x3c;
-    const int height2 = 0x20; 
+    const int height2 = 0x20;
 
     .byte 1, 2, 3, 4, 5
     .entry:
@@ -692,5 +693,5 @@ import Window="bench\window.bmasm";
 
     .endsegment
 
-    ; create procs
-    Init.Setup();
+    ; every library's procs
+    place code
